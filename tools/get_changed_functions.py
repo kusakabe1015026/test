@@ -11,8 +11,6 @@ head_sha = sys.argv[2]
 
 WORKSPACE = pathlib.Path(os.environ["GITHUB_WORKSPACE"]).resolve()
 
-# ★ 追加：解析対象ディレクトリ（repo rootからの相対）
-# 例: "src include"
 TARGET_DIRS = os.environ.get("TARGET_DIRS", "").split()
 TARGET_DIRS = [d.strip().strip("/") for d in TARGET_DIRS if d.strip()]
 
@@ -87,28 +85,26 @@ def collect_functions(filename):
     functions = []
 
     def walk(node):
-        if node.location.file is None:
-            for child in node.get_children():
-                walk(child)
-            return
+        # ★修正ポイント①：file=None でも探索は止めない
+        if node.location.file is not None:
+            node_file = to_repo_path(node.location.file.name)
 
-        node_file = to_repo_path(node.location.file.name)
+            if node_file == filename:
+                if node.kind in (
+                    CursorKind.FUNCTION_DECL,
+                    CursorKind.CXX_METHOD,
+                    CursorKind.CONSTRUCTOR,
+                    CursorKind.DESTRUCTOR,
+                ):
+                    functions.append(
+                        {
+                            "name": node.spelling,
+                            "start": node.extent.start.line,
+                            "end": node.extent.end.line,
+                        }
+                    )
 
-        if node_file == filename:
-            if node.kind in (
-                CursorKind.FUNCTION_DECL,
-                CursorKind.CXX_METHOD,
-                CursorKind.CONSTRUCTOR,
-                CursorKind.DESTRUCTOR,
-            ):
-                functions.append(
-                    {
-                        "name": node.spelling,
-                        "start": node.extent.start.line,
-                        "end": node.extent.end.line,
-                    }
-                )
-
+        # ★修正ポイント②：必ず子を全部走査（ここが重要）
         for child in node.get_children():
             walk(child)
 
@@ -124,13 +120,10 @@ changed_functions = []
 
 for filename, lines in changed_lines.items():
 
-    # ★ここが本体：ディレクトリフィルタ
     if not is_target_file(filename):
         continue
 
-    if not filename.endswith(
-        (".c", ".cc", ".cpp", ".cxx", ".h", ".hpp")
-    ):
+    if not filename.endswith((".c", ".cc", ".cpp", ".cxx", ".h", ".hpp")):
         continue
 
     print(
