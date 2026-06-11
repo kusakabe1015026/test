@@ -17,7 +17,7 @@ def load_changed_functions(path):
 # load compile database sources (for validation only)
 # --------------------------------------------------
 def load_compile_db_sources():
-    with open("compile_commands.json", encoding="utf-8") as f:
+    with open("build/compile_commands.json", encoding="utf-8") as f:
         db = json.load(f)
 
     return {
