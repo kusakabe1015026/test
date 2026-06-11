@@ -1,0 +1,39 @@
+name: Cognitive Complexity
+
+on:
+pull_request:
+
+jobs:
+changed-functions:
+runs-on: ubuntu-latest
+
+```
+permissions:
+  pull-requests: write
+  contents: read
+
+steps:
+  - uses: actions/checkout@v4
+    with:
+      fetch-depth: 0
+
+  - name: Install clang
+    run: |
+      sudo apt-get update
+      sudo apt-get install -y clang python3-clang
+
+  - name: Get changed functions
+    run: |
+      python3 tools/get_changed_functions.py \
+        "${{ github.event.pull_request.base.sha }}" \
+        "${{ github.sha }}" \
+        > changed_functions.json
+
+  - name: Comment PR
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    run: |
+      python3 tools/comment_pr.py changed_functions.json
+```
+
