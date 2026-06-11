@@ -8,7 +8,7 @@ static const char encoding[] =
 
 std::string EncodeBase64(const unsigned char *data, std::size_t size) {
   const char PAD = '=';
-
+//
   std::string ret;
   ret.resize(4 * size / 3 + 3);
   char *out = &ret[0];
