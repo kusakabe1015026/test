@@ -26,7 +26,7 @@ def get_changed_lines():
     current_file = None
 
     for line in diff.splitlines():
-	print("line=", line)
+        print("line=", line)
         if line.startswith("+++ b/"):
             current_file = line[6:]
             result.setdefault(current_file, set())
