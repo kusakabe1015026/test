@@ -4,7 +4,9 @@ import re
 import subprocess
 
 import os
+import sys
 
+print("ARG =", sys.argv)
 print("PWD =", os.getcwd())
 print("compile_commands.json exists =", os.path.exists("compile_commands.json"))
 
