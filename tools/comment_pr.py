@@ -27,7 +27,7 @@ else:
 
         body += (
             f"- [`{fn['function']}`]({url}) "
-            f"(`{fn['file']}:{fn['start_line']}`) "
+            f"(`{fn['file']}:{fn['line']}`) "
             f"complexity={fn.get('complexity','?')}\n"
         )
 
