@@ -10,26 +10,38 @@ COMPILE_DB = pathlib.Path("build/compile_commands.json")
 OUTPUT_FILE = "complexity.json"
 
 
-def normalize(p):
+# ----------------------------
+# util
+# ----------------------------
+def norm(p):
     return os.path.basename(str(p))
 
 
+# ----------------------------
+# load changed functions
+# ----------------------------
 def load_changed(path):
     with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
+# ----------------------------
+# load compile DB
+# ----------------------------
 def load_compile_db():
     with open(COMPILE_DB, encoding="utf-8") as f:
         db = json.load(f)
 
     file_map = {}
     for e in db:
-        file_map[normalize(e["file"])] = e["file"]
+        file_map[norm(e["file"])] = e["file"]
 
     return file_map
 
 
+# ----------------------------
+# clang-tidy run
+# ----------------------------
 def run_clang_tidy(file_path):
     cmd = [
         "clang-tidy",
@@ -40,7 +52,7 @@ def run_clang_tidy(file_path):
         "-config={CheckOptions: [{key: readability-function-cognitive-complexity.Threshold, value: \"0\"}]}",
     ]
 
-    result = subprocess.run(
+    r = subprocess.run(
         cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -49,50 +61,103 @@ def run_clang_tidy(file_path):
         errors="replace",
     )
 
-    return result.stdout
+    return r.stdout
 
 
+# ----------------------------
+# parse clang-tidy output
+# IMPORTANT: extract line number
+# ----------------------------
 pattern = re.compile(
-    r"function '([^']+)' has cognitive complexity of (\d+)"
+    r"(.+?):(\d+):\d+: warning: function '([^']+)' has cognitive complexity of (\d+)"
 )
 
 
-def parse(output, file_path):
-    out = []
+def parse(output):
+    results = []
+
     for m in pattern.finditer(output):
-        out.append({
-            "file": file_path,
-            "function": m.group(1),
-            "complexity": int(m.group(2)),
+        results.append({
+            "file": m.group(1),
+            "line": int(m.group(2)),
+            "function": m.group(3),
+            "complexity": int(m.group(4)),
         })
-    return out
+
+    return results
 
 
+# ----------------------------
+# check if changed function
+# ----------------------------
+def is_changed(r, changed_map):
+    file = norm(r["file"])
+
+    if file not in changed_map:
+        return False
+
+    for start, end, name in changed_map[file]:
+        if r["function"] == name and start <= r["line"] <= end:
+            return True
+
+    return False
+
+
+# ----------------------------
+# main
+# ----------------------------
 def main():
     changed = load_changed(sys.argv[1])
 
-    changed_files = {normalize(f["file"]) for f in changed}
+    print(f"[INFO] changed functions = {len(changed)}", file=sys.stderr)
+
+    # file -> [(start,end,function)]
+    changed_map = {}
+
+    changed_files = set()
+
+    for fn in changed:
+        file = norm(fn["file"])
+        changed_files.add(file)
+
+        changed_map.setdefault(file, []).append(
+            (fn["start_line"], fn["end_line"], fn["function"])
+        )
 
     file_map = load_compile_db()
 
+    targets = [
+        f for f in changed_files
+        if f in file_map
+    ]
+
+    print(f"[INFO] clang-tidy targets = {len(targets)}", file=sys.stderr)
+
     results = []
 
-    for f in changed_files:
-        if f not in file_map:
-            continue
-
+    for f in targets:
         real = file_map[f]
 
         print(f"[TIDY] {real}", file=sys.stderr)
 
         out = run_clang_tidy(real)
-        results.extend(parse(out, real))
+        results.extend(parse(out))
 
-    # ★重要：ここで必ずファイル出力
+    # ----------------------------
+    # FINAL FILTER (ここが本体)
+    # ----------------------------
+    filtered = [
+        r for r in results
+        if is_changed(r, changed_map)
+    ]
+
+    # ----------------------------
+    # write output
+    # ----------------------------
     with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2)
+        json.dump(filtered, f, indent=2)
 
-    print(f"[INFO] wrote {OUTPUT_FILE} ({len(results)} entries)", file=sys.stderr)
+    print(f"[INFO] wrote {OUTPUT_FILE}: {len(filtered)} entries", file=sys.stderr)
 
 
 if __name__ == "__main__":

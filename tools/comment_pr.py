@@ -4,35 +4,58 @@ import subprocess
 import sys
 
 
-path = sys.argv[1]
+REPO = os.environ["GITHUB_REPOSITORY"]
+SHA = os.environ["GITHUB_SHA"]
+PR_NUMBER = os.environ["PR_NUMBER"]
 
-if not os.path.exists(path):
-    print("complexity.json not found")
-    sys.exit(0)
 
-with open(path) as f:
+def to_repo_path(path):
+    path = str(path)
+
+    marker = "/src/"
+    if marker in path:
+        return "src/" + path.split(marker, 1)[1]
+
+    return path
+
+
+def make_link(file, line):
+    file = to_repo_path(file)
+    return f"https://github.com/{REPO}/blob/{SHA}/{file}#L{line}"
+
+
+with open(sys.argv[1]) as f:
     functions = json.load(f)
+
 
 body = "## Cognitive Complexity Report\n\n"
 
 if not functions:
-    body += "No warnings.\n"
+    body += "No changed functions detected.\n"
 else:
     for fn in functions:
+        url = make_link(fn["file"], fn["line"])
+
         body += (
-            f"- `{fn['function']}` "
-            f"({fn['file']}) complexity={fn['complexity']}\n"
+            f"- [`{fn['function']}`]({url}) "
+            f"({fn['file']}:{fn['line']}) "
+            f"complexity={fn['complexity']}\n"
         )
+
+
+env = os.environ.copy()
+env["GH_TOKEN"] = os.environ["GH_TOKEN"]
 
 subprocess.run(
     [
         "gh",
         "pr",
         "comment",
-        os.environ["PR_NUMBER"],
+        PR_NUMBER,
         "--body",
         body,
     ],
     check=True,
+    env=env,
 )
 
