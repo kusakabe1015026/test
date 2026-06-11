@@ -11,6 +11,7 @@ void* BuildGraphOfNextDocument(Parser& parser,
   if (parser.HandleNextDocument(eventHandler)) {
     return eventHandler.RootNode();
   }
+//
   return nullptr;
 }
 }  // namespace YAML
