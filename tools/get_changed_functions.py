@@ -85,16 +85,7 @@ def collect_functions(filename):
     functions = []
 
     def walk(node):
-        # ★修正ポイント①：file=None でも探索は止めない
         if node.location.file is not None:
-            print(
-                f"[AST] "
-                f"node={node.kind} "
-                f"spelling={node.spelling} "
-                f"file={node.location.file.name} "
-                f"line={node.location.line}",
-                file=sys.stderr,
-            )
             node_file = to_repo_path(node.location.file.name)
 
             if node_file == filename:
@@ -112,7 +103,6 @@ def collect_functions(filename):
                         }
                     )
 
-        # ★修正ポイント②：必ず子を全部走査（ここが重要）
         for child in node.get_children():
             walk(child)
 
@@ -147,6 +137,7 @@ for filename, lines in changed_lines.items():
 
     for fn in functions:
         matched = any(
+            print(fn["name"], fn["start"], fn["end"], list(lines))
             fn["start"] <= line <= fn["end"]
             for line in lines
         )
