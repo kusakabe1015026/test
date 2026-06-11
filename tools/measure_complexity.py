@@ -1,61 +1,65 @@
 import json
+import pathlib
 import re
 import subprocess
-import sys
 
-with open(sys.argv[1]) as f:
-    changed_functions = json.load(f)
 
-files = sorted(
-    {
-        item["file"]
-        for item in changed_functions
-    }
-)
+def load_sources():
+    with open("compile_commands.json", encoding="utf-8") as f:
+        db = json.load(f)
 
-results = []
-
-for filename in files:
-    proc = subprocess.run(
-        [
-            "clang-tidy",
-            filename,
-            "-checks=-*,readability-function-cognitive-complexity",
-            "-config={CheckOptions:[{key: readability-function-cognitive-complexity.Threshold,value: 0}]}",
-        ],
-        capture_output=True,
-        text=True,
+    return sorted(
+        {
+            entry["file"]
+            for entry in db
+            if pathlib.Path(entry["file"]).suffix.lower()
+            in (".c", ".cc", ".cpp", ".cxx", ".c++")
+        }
     )
 
-    output = proc.stdout + proc.stderr
 
-    for line in output.splitlines():
-        m = re.search(
+def run_clang_tidy(file_path):
+    result = subprocess.run(
+        [
+            "clang-tidy",
+            file_path,
+            "-p",
+            ".",
+            "-checks=readability-function-cognitive-complexity",
+            "-config={CheckOptions: [{key: readability-function-cognitive-complexity.Threshold, value: \"0\"}]}",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+
+    return result.stdout
+
+
+def parse_complexity(output):
+    return [
+        {
+            "function": m.group(1),
+            "complexity": int(m.group(2)),
+        }
+        for m in re.finditer(
             r"function '([^']+)' has cognitive complexity of (\d+)",
-            line,
+            output,
         )
+    ]
 
-        if not m:
-            continue
 
-        results.append(
-            {
-                "function": m.group(1),
-                "complexity": int(m.group(2)),
-                "file": filename,
-            }
-        )
+def collect_complexity():
+    results = []
 
-changed_names = {
-    (item["file"], item["function"])
-    for item in changed_functions
-}
+    sources = load_sources()
 
-filtered = [
-    item
-    for item in results
-    if (item["file"], item["function"]) in changed_names
-]
+    for src in sources:
+        for item in parse_complexity(run_clang_tidy(src)):
+            item["file"] = src
+            results.append(item)
 
-print(json.dumps(filtered, indent=2))
+    return results
 
