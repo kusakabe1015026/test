@@ -1,4 +1,5 @@
-import json
+mport json
+import os
 import subprocess
 import sys
 
@@ -26,7 +27,6 @@ def get_changed_lines():
     current_file = None
 
     for line in diff.splitlines():
-        print("line=", line)
         if line.startswith("+++ b/"):
             current_file = line[6:]
             result.setdefault(current_file, set())
@@ -50,41 +50,58 @@ def get_changed_lines():
         for n in range(start, start + count):
             result[current_file].add(n)
 
+    print("changed_lines=", result, file=sys.stderr)
+
     return result
 
 
 def collect_functions(filename):
-    index = Index.create()
+    print(f"parsing {filename}", file=sys.stderr)
 
+    index = Index.create()
     tu = index.parse(filename)
 
     functions = []
 
+    abs_filename = os.path.abspath(filename)
+
     def walk(node):
         if node.location.file is None:
+            for child in node.get_children():
+                walk(child)
             return
 
-        if node.location.file.name != filename:
-            return
+        node_file = os.path.abspath(node.location.file.name)
 
-        if node.kind in (
-            CursorKind.FUNCTION_DECL,
-            CursorKind.CXX_METHOD,
-            CursorKind.CONSTRUCTOR,
-            CursorKind.DESTRUCTOR,
-        ):
-            functions.append(
-                {
+        if node_file == abs_filename:
+            if node.kind in (
+                CursorKind.FUNCTION_DECL,
+                CursorKind.CXX_METHOD,
+                CursorKind.CONSTRUCTOR,
+                CursorKind.DESTRUCTOR,
+            ):
+                fn = {
                     "name": node.spelling,
                     "start": node.extent.start.line,
                     "end": node.extent.end.line,
                 }
-            )
+
+                print(
+                    f"function found: {fn}",
+                    file=sys.stderr,
+                )
+
+                functions.append(fn)
 
         for child in node.get_children():
             walk(child)
 
     walk(tu.cursor)
+
+    print(
+        f"{filename}: {len(functions)} functions",
+        file=sys.stderr,
+    )
 
     return functions
 
@@ -104,16 +121,34 @@ for filename, lines in changed_lines.items():
     ):
         continue
 
+    print(
+        f"checking file={filename} changed_lines={sorted(lines)}",
+        file=sys.stderr,
+    )
+
     try:
         functions = collect_functions(filename)
-    except Exception:
+    except Exception as e:
+        print(
+            f"ERROR parsing {filename}: {e}",
+            file=sys.stderr,
+        )
         continue
 
     for fn in functions:
-        if any(
+        matched = any(
             fn["start"] <= line <= fn["end"]
             for line in lines
-        ):
+        )
+
+        print(
+            f"function={fn['name']} "
+            f"range={fn['start']}-{fn['end']} "
+            f"matched={matched}",
+            file=sys.stderr,
+        )
+
+        if matched:
             changed_functions.append(
                 {
                     "file": filename,
