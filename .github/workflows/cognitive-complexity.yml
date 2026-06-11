@@ -1,4 +1,4 @@
-me: Cognitive Complexity
+name: Cognitive Complexity
 
 on:
   pull_request:
