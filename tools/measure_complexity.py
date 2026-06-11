@@ -3,6 +3,10 @@ import pathlib
 import re
 import subprocess
 
+import os
+
+print("PWD =", os.getcwd())
+print("compile_commands.json exists =", os.path.exists("compile_commands.json"))
 
 def load_sources():
     with open("compile_commands.json", encoding="utf-8") as f:
