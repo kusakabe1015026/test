@@ -136,8 +136,8 @@ for filename, lines in changed_lines.items():
         continue
 
     for fn in functions:
+        print(fn["name"], fn["start"], fn["end"], list(lines))
         matched = any(
-            print(fn["name"], fn["start"], fn["end"], list(lines))
             fn["start"] <= line <= fn["end"]
             for line in lines
         )
