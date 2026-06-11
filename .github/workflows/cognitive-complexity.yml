@@ -41,6 +41,8 @@ jobs:
           sudo apt-get install -y clang python3-clang
 
       - name: Get changed functions
+        env:
+          TARGET_DIRS: "src"
         run: |
           python3 tools/get_changed_functions.py \
             "${{ github.event.pull_request.base.sha }}" \
