@@ -53,6 +53,10 @@ jobs:
           cat changed_functions.json
           echo "=================================="
 
+      - name: Build compile database + analyze complexity
+        run: |
+          python3 tools/measure_complexity.py .
+
       - name: Comment PR
         env:
           GH_TOKEN: ${{ github.token }}
