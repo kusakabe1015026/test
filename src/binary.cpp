@@ -69,7 +69,7 @@ std::vector<unsigned char> DecodeBase64(const std::string &input) {
   using ret_type = std::vector<unsigned char>;
   if (input.empty())
     return ret_type();
-
+//
   ret_type ret(3 * input.size() / 4 + 1);
   unsigned char *out = &ret[0];
 
