@@ -2,8 +2,8 @@ import json
 import os
 import subprocess
 import sys
-import pathlib
 from clang.cindex import CursorKind, Index
+import pathlib
 
 
 base_sha = sys.argv[1]
@@ -11,6 +11,8 @@ head_sha = sys.argv[2]
 
 WORKSPACE = pathlib.Path(os.environ["GITHUB_WORKSPACE"]).resolve()
 
+# ★ 追加：解析対象ディレクトリ（repo rootからの相対）
+# 例: "src include"
 TARGET_DIRS = os.environ.get("TARGET_DIRS", "").split()
 TARGET_DIRS = [d.strip().strip("/") for d in TARGET_DIRS if d.strip()]
 
@@ -18,21 +20,27 @@ TARGET_DIRS = [d.strip().strip("/") for d in TARGET_DIRS if d.strip()]
 def is_target_file(repo_path: str) -> bool:
     if not TARGET_DIRS:
         return True
-    return any(repo_path == d or repo_path.startswith(d + "/") for d in TARGET_DIRS)
+
+    return any(
+        repo_path == d or repo_path.startswith(d + "/")
+        for d in TARGET_DIRS
+    )
 
 
 def to_repo_path(path: str) -> str:
     p = pathlib.Path(path)
 
+    if path.startswith("a/") or path.startswith("b/"):
+        path = path[2:]
+        p = pathlib.Path(path)
+
     try:
-        return str(p.resolve().relative_to(WORKSPACE)).replace("\\", "/")
+        p = p.resolve()
+        return str(p.relative_to(WORKSPACE)).replace("\\", "/")
     except Exception:
-        return str(p).replace("\\", "/")
+        return str(path).replace("\\", "/")
 
 
-# ----------------------------
-# git diff -> changed lines
-# ----------------------------
 def get_changed_lines():
     diff = subprocess.check_output(
         ["git", "diff", "--unified=0", base_sha, head_sha],
@@ -70,36 +78,36 @@ def get_changed_lines():
     return result
 
 
-# ----------------------------
-# clang AST -> functions
-# ----------------------------
 def collect_functions(filename):
     print(f"parsing {filename}", file=sys.stderr)
 
     index = Index.create()
-    tu = index.parse(filename, args=["-std=c++17"])
+    tu = index.parse(filename)
 
     functions = []
 
     def walk(node):
-        if node.kind in (
-            CursorKind.FUNCTION_DECL,
-            CursorKind.CXX_METHOD,
-            CursorKind.CONSTRUCTOR,
-            CursorKind.DESTRUCTOR,
-        ):
-            loc = node.location
+        if node.location.file is None:
+            for child in node.get_children():
+                walk(child)
+            return
 
-            if loc.file is not None:
-                node_file = to_repo_path(loc.file.name)
+        node_file = to_repo_path(node.location.file.name)
 
-                if node_file == filename:
-                    functions.append(
-                        {
-                            "name": node.spelling,
-                            "line": loc.line,
-                        }
-                    )
+        if node_file == filename:
+            if node.kind in (
+                CursorKind.FUNCTION_DECL,
+                CursorKind.CXX_METHOD,
+                CursorKind.CONSTRUCTOR,
+                CursorKind.DESTRUCTOR,
+            ):
+                functions.append(
+                    {
+                        "name": node.spelling,
+                        "start": node.extent.start.line,
+                        "end": node.extent.end.line,
+                    }
+                )
 
         for child in node.get_children():
             walk(child)
@@ -110,21 +118,25 @@ def collect_functions(filename):
     return functions
 
 
-# ----------------------------
-# main
-# ----------------------------
 changed_lines = get_changed_lines()
+
 changed_functions = []
 
 for filename, lines in changed_lines.items():
 
+    # ★ここが本体：ディレクトリフィルタ
     if not is_target_file(filename):
         continue
 
-    if not filename.endswith((".c", ".cc", ".cpp", ".cxx", ".h", ".hpp")):
+    if not filename.endswith(
+        (".c", ".cc", ".cpp", ".cxx", ".h", ".hpp")
+    ):
         continue
 
-    print(f"checking file={filename} changed_lines={sorted(lines)}", file=sys.stderr)
+    print(
+        f"checking file={filename} changed_lines={sorted(lines)}",
+        file=sys.stderr,
+    )
 
     try:
         functions = collect_functions(filename)
@@ -133,13 +145,18 @@ for filename, lines in changed_lines.items():
         continue
 
     for fn in functions:
-        # ★ 重要：関数開始行が変更行に含まれるか
-        if fn["line"] in lines:
+        matched = any(
+            fn["start"] <= line <= fn["end"]
+            for line in lines
+        )
+
+        if matched:
             changed_functions.append(
                 {
                     "file": filename,
                     "function": fn["name"],
-                    "start_line": fn["line"],
+                    "start_line": fn["start"],
+                    "end_line": fn["end"],
                 }
             )
 
