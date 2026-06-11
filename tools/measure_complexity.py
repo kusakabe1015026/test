@@ -2,81 +2,39 @@ import json
 import pathlib
 import subprocess
 import sys
-import os
 import re
-import shutil
 
 
-# -----------------------------
-# config
-# -----------------------------
-CMAKE_SOURCE_DIR = sys.argv[1] if len(sys.argv) > 1 else "."
-BUILD_DIR = pathlib.Path(".analysis_build")
-COMPILE_DB = BUILD_DIR / "compile_commands.json"
+# --------------------------------------------------
+# load changed functions
+# --------------------------------------------------
+def load_changed_functions(path):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
 
 
-# -----------------------------
-# step 1: generate compile_commands.json
-# -----------------------------
-def generate_compile_db():
-    if BUILD_DIR.exists():
-        shutil.rmtree(BUILD_DIR)
-
-    BUILD_DIR.mkdir(parents=True, exist_ok=True)
-
-    cmd = [
-        "cmake",
-        "-S",
-        CMAKE_SOURCE_DIR,
-        "-B",
-        str(BUILD_DIR),
-        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-    ]
-
-    print("[INFO] running cmake:", " ".join(cmd), file=sys.stderr)
-
-    result = subprocess.run(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
-
-    if result.returncode != 0:
-        print(result.stdout, file=sys.stderr)
-        raise RuntimeError("cmake configure failed")
-
-    if not COMPILE_DB.exists():
-        raise RuntimeError("compile_commands.json not generated")
-
-    print("[INFO] compile DB generated at", COMPILE_DB, file=sys.stderr)
-
-
-# -----------------------------
-# step 2: load compile DB
-# -----------------------------
-def load_sources():
-    with open(COMPILE_DB, encoding="utf-8") as f:
+# --------------------------------------------------
+# load compile database sources (for validation only)
+# --------------------------------------------------
+def load_compile_db_sources():
+    with open("compile_commands.json", encoding="utf-8") as f:
         db = json.load(f)
 
-    sources = []
-    for entry in db:
-        path = entry["file"]
-        if path.endswith((".c", ".cc", ".cpp", ".cxx", ".hpp", ".h")):
-            sources.append(path)
-
-    return sorted(set(sources))
+    return {
+        entry["file"]
+        for entry in db
+    }
 
 
-# -----------------------------
-# step 3: run clang-tidy
-# -----------------------------
+# --------------------------------------------------
+# run clang-tidy on single file
+# --------------------------------------------------
 def run_clang_tidy(file_path):
     cmd = [
         "clang-tidy",
         file_path,
         "-p",
-        str(BUILD_DIR),
+        ".",
         "-checks=readability-function-cognitive-complexity",
         "-config={CheckOptions: [{key: readability-function-cognitive-complexity.Threshold, value: \"0\"}]}",
     ]
@@ -86,14 +44,16 @@ def run_clang_tidy(file_path):
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
 
     return result.stdout
 
 
-# -----------------------------
-# step 4: parse output
-# -----------------------------
+# --------------------------------------------------
+# parse clang-tidy output
+# --------------------------------------------------
 pattern = re.compile(
     r"function '([^']+)' has cognitive complexity of (\d+)"
 )
@@ -101,6 +61,7 @@ pattern = re.compile(
 
 def parse(output, file_path):
     results = []
+
     for m in pattern.finditer(output):
         results.append(
             {
@@ -109,36 +70,68 @@ def parse(output, file_path):
                 "complexity": int(m.group(2)),
             }
         )
+
     return results
 
 
-# -----------------------------
-# main
-# -----------------------------
+# --------------------------------------------------
+# main logic
+# --------------------------------------------------
 def main():
-    generate_compile_db()
+    changed = load_changed_functions(sys.argv[1])
 
-    sources = load_sources()
+    if not changed:
+        print("[]")
+        return
 
-    print(f"[INFO] sources: {len(sources)}", file=sys.stderr)
+    # 対象ファイルだけ抽出
+    changed_files = {
+        fn["file"] for fn in changed
+    }
+
+    print(f"[INFO] changed files = {len(changed_files)}", file=sys.stderr)
+
+    compile_sources = load_compile_db_sources()
+
+    # compile DBに存在するものだけ実行
+    targets = [
+        f for f in changed_files
+        if f in compile_sources
+    ]
+
+    print(f"[INFO] clang-tidy targets = {len(targets)}", file=sys.stderr)
 
     all_results = []
 
-    for src in sources:
-        print(f"[INFO] analyzing {src}", file=sys.stderr)
+    # ファイル単位で解析（ここが最適化ポイント）
+    for f in targets:
+        print(f"[TIDY] {f}", file=sys.stderr)
 
-        output = run_clang_tidy(src)
+        output = run_clang_tidy(f)
 
-        results = parse(output, src)
+        all_results.extend(parse(output, f))
 
-        for r in results:
-            print(f"{r['file']}::{r['function']} = {r['complexity']}")
+    # changed_functions と突合（関数名ベース）
+    filtered = []
 
-            all_results.append(r)
+    for fn in changed:
+        file = fn["file"]
+        name = fn["function"]
 
-    # optional JSON dump for later steps
-    with open("complexity.json", "w", encoding="utf-8") as f:
-        json.dump(all_results, f, indent=2)
+        for r in all_results:
+            if r["file"] != file:
+                continue
+
+            if r["function"] == name:
+                filtered.append(
+                    {
+                        **fn,
+                        "complexity": r["complexity"],
+                    }
+                )
+
+    # output to stdout
+    print(json.dumps(filtered, indent=2))
 
 
 if __name__ == "__main__":

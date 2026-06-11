@@ -1,139 +1,74 @@
-import json
-import pathlib
-import subprocess
-import sys
-import re
+name: Cognitive Complexity
 
+on:
+  pull_request:
+  workflow_dispatch:
 
-# --------------------------------------------------
-# load changed functions
-# --------------------------------------------------
-def load_changed_functions(path):
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+jobs:
+  changed-functions:
+    runs-on: ubuntu-latest
 
+    permissions:
+      pull-requests: write
+      contents: read
 
-# --------------------------------------------------
-# load compile database sources (for validation only)
-# --------------------------------------------------
-def load_compile_db_sources():
-    with open("compile_commands.json", encoding="utf-8") as f:
-        db = json.load(f)
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-    return {
-        entry["file"]
-        for entry in db
-    }
+      - name: Debug SHAs
+        run: |
+          echo "BASE=${{ github.event.pull_request.base.sha }}"
+          echo "HEAD=${{ github.event.pull_request.head.sha }}"
+          echo "GITHUB_SHA=${{ github.sha }}"
 
+          echo
+          echo "===== BASE COMMIT ====="
+          git show --no-patch --stat ${{ github.event.pull_request.base.sha }}
 
-# --------------------------------------------------
-# run clang-tidy on single file
-# --------------------------------------------------
-def run_clang_tidy(file_path):
-    cmd = [
-        "clang-tidy",
-        file_path,
-        "-p",
-        ".",
-        "-checks=readability-function-cognitive-complexity",
-        "-config={CheckOptions: [{key: readability-function-cognitive-complexity.Threshold, value: \"0\"}]}",
-    ]
+          echo
+          echo "===== HEAD COMMIT ====="
+          git show --no-patch --stat ${{ github.event.pull_request.head.sha }}
 
-    result = subprocess.run(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
+          echo
+          echo "===== GITHUB_SHA COMMIT ====="
+          git show --no-patch --stat ${{ github.sha }}
 
-    return result.stdout
+      - name: Install clang
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang python3-clang
 
+      - name: Get changed functions
+        run: |
+          python3 tools/get_changed_functions.py \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.sha }}" \
+            > changed_functions.json
 
-# --------------------------------------------------
-# parse clang-tidy output
-# --------------------------------------------------
-pattern = re.compile(
-    r"function '([^']+)' has cognitive complexity of (\d+)"
-)
+          echo "===== changed_functions.json ====="
+          ls -l changed_functions.json
+          wc -c changed_functions.json
+          cat changed_functions.json
+          echo "=================================="
 
+      - name: Measure complexity
+        run: |
+          python3 tools/measure_complexity.py .
 
-def parse(output, file_path):
-    results = []
+      - name: Comment PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          echo "===== Before comment_pr.py ====="
+          pwd
+          ls -la
+          ls -l changed_functions.json
+          wc -c changed_functions.json
+          cat changed_functions.json
+          echo "================================"
 
-    for m in pattern.finditer(output):
-        results.append(
-            {
-                "file": file_path,
-                "function": m.group(1),
-                "complexity": int(m.group(2)),
-            }
-        )
-
-    return results
-
-
-# --------------------------------------------------
-# main logic
-# --------------------------------------------------
-def main():
-    changed = load_changed_functions(sys.argv[1])
-
-    if not changed:
-        print("[]")
-        return
-
-    # 対象ファイルだけ抽出
-    changed_files = {
-        fn["file"] for fn in changed
-    }
-
-    print(f"[INFO] changed files = {len(changed_files)}", file=sys.stderr)
-
-    compile_sources = load_compile_db_sources()
-
-    # compile DBに存在するものだけ実行
-    targets = [
-        f for f in changed_files
-        if f in compile_sources
-    ]
-
-    print(f"[INFO] clang-tidy targets = {len(targets)}", file=sys.stderr)
-
-    all_results = []
-
-    # ファイル単位で解析（ここが最適化ポイント）
-    for f in targets:
-        print(f"[TIDY] {f}", file=sys.stderr)
-
-        output = run_clang_tidy(f)
-
-        all_results.extend(parse(output, f))
-
-    # changed_functions と突合（関数名ベース）
-    filtered = []
-
-    for fn in changed:
-        file = fn["file"]
-        name = fn["function"]
-
-        for r in all_results:
-            if r["file"] != file:
-                continue
-
-            if r["function"] == name:
-                filtered.append(
-                    {
-                        **fn,
-                        "complexity": r["complexity"],
-                    }
-                )
-
-    # output to stdout
-    print(json.dumps(filtered, indent=2))
-
-
-if __name__ == "__main__":
-    main()
+          python3 tools/comment_pr.py complexity.json
 
