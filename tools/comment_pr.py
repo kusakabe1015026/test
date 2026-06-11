@@ -7,14 +7,14 @@ import sys
 REPO = os.environ["GITHUB_REPOSITORY"]
 SHA = os.environ["GITHUB_SHA"]
 PR_NUMBER = os.environ["PR_NUMBER"]
-
+WORKSPACE = os.environ["GITHUB_WORKSPACE"]
 
 def to_repo_path(path):
-    path = str(path)
+    path = os.path.abspath(path)
+    workspace = os.path.abspath(WORKSPACE)
 
-    marker = "/src/"
-    if marker in path:
-        return "src/" + path.split(marker, 1)[1]
+    if path.startswith(workspace):
+        return os.path.relpath(path, workspace)
 
     return path
 
