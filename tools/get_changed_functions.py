@@ -87,6 +87,14 @@ def collect_functions(filename):
     def walk(node):
         # ★修正ポイント①：file=None でも探索は止めない
         if node.location.file is not None:
+            print(
+                f"[AST] "
+                f"node={node.kind} "
+                f"spelling={node.spelling} "
+                f"file={node.location.file.name} "
+                f"line={node.location.line}",
+                file=sys.stderr,
+            )
             node_file = to_repo_path(node.location.file.name)
 
             if node_file == filename:
