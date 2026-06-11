@@ -23,7 +23,7 @@ if not functions:
     body += "No changed functions detected.\n"
 else:
     for fn in functions:
-        url = make_link(fn["file"], fn["start_line"])
+        url = make_link(fn["file"], fn["line"])
 
         body += (
             f"- [`{fn['function']}`]({url}) "
