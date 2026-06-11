@@ -17,10 +17,23 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Debug SHA
+      - name: Debug SHAs
         run: |
           echo "BASE=${{ github.event.pull_request.base.sha }}"
-          echo "HEAD=${{ github.sha }}"
+          echo "HEAD=${{ github.event.pull_request.head.sha }}"
+          echo "GITHUB_SHA=${{ github.sha }}"
+
+          echo
+          echo "===== BASE COMMIT ====="
+          git show --no-patch --stat ${{ github.event.pull_request.base.sha }}
+
+          echo
+          echo "===== HEAD COMMIT ====="
+          git show --no-patch --stat ${{ github.event.pull_request.head.sha }}
+
+          echo
+          echo "===== GITHUB_SHA COMMIT ====="
+          git show --no-patch --stat ${{ github.sha }}
 
       - name: Install clang
         run: |
