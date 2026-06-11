@@ -1,4 +1,4 @@
-name: Cognitive Complexity
+me: Cognitive Complexity
 
 on:
   pull_request:
@@ -17,6 +17,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Debug SHA
+        run: |
+          echo "BASE=${{ github.event.pull_request.base.sha }}"
+          echo "HEAD=${{ github.sha }}"
+
       - name: Install clang
         run: |
           sudo apt-get update
@@ -29,10 +34,24 @@ jobs:
             "${{ github.sha }}" \
             > changed_functions.json
 
+          echo "===== changed_functions.json ====="
+          ls -l changed_functions.json
+          wc -c changed_functions.json
+          cat changed_functions.json
+          echo "=================================="
+
       - name: Comment PR
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
+          echo "===== Before comment_pr.py ====="
+          pwd
+          ls -la
+          ls -l changed_functions.json
+          wc -c changed_functions.json
+          cat changed_functions.json
+          echo "================================"
+
           python3 tools/comment_pr.py changed_functions.json
 
