@@ -2,8 +2,8 @@ import json
 import os
 import subprocess
 import sys
-from clang.cindex import CursorKind, Index
 import pathlib
+from clang.cindex import CursorKind, Index
 
 
 base_sha = sys.argv[1]
@@ -18,27 +18,21 @@ TARGET_DIRS = [d.strip().strip("/") for d in TARGET_DIRS if d.strip()]
 def is_target_file(repo_path: str) -> bool:
     if not TARGET_DIRS:
         return True
-
-    return any(
-        repo_path == d or repo_path.startswith(d + "/")
-        for d in TARGET_DIRS
-    )
+    return any(repo_path == d or repo_path.startswith(d + "/") for d in TARGET_DIRS)
 
 
 def to_repo_path(path: str) -> str:
     p = pathlib.Path(path)
 
-    if path.startswith("a/") or path.startswith("b/"):
-        path = path[2:]
-        p = pathlib.Path(path)
-
     try:
-        p = p.resolve()
-        return str(p.relative_to(WORKSPACE)).replace("\\", "/")
+        return str(p.resolve().relative_to(WORKSPACE)).replace("\\", "/")
     except Exception:
-        return str(path).replace("\\", "/")
+        return str(p).replace("\\", "/")
 
 
+# ----------------------------
+# git diff -> changed lines
+# ----------------------------
 def get_changed_lines():
     diff = subprocess.check_output(
         ["git", "diff", "--unified=0", base_sha, head_sha],
@@ -76,30 +70,34 @@ def get_changed_lines():
     return result
 
 
+# ----------------------------
+# clang AST -> functions
+# ----------------------------
 def collect_functions(filename):
     print(f"parsing {filename}", file=sys.stderr)
 
     index = Index.create()
-    tu = index.parse(filename)
+    tu = index.parse(filename, args=["-std=c++17"])
 
     functions = []
 
     def walk(node):
-        if node.location.file is not None:
-            node_file = to_repo_path(node.location.file.name)
+        if node.kind in (
+            CursorKind.FUNCTION_DECL,
+            CursorKind.CXX_METHOD,
+            CursorKind.CONSTRUCTOR,
+            CursorKind.DESTRUCTOR,
+        ):
+            loc = node.location
 
-            if node_file == filename:
-                if node.kind in (
-                    CursorKind.FUNCTION_DECL,
-                    CursorKind.CXX_METHOD,
-                    CursorKind.CONSTRUCTOR,
-                    CursorKind.DESTRUCTOR,
-                ):
+            if loc.file is not None:
+                node_file = to_repo_path(loc.file.name)
+
+                if node_file == filename:
                     functions.append(
                         {
                             "name": node.spelling,
-                            "start": node.extent.start.line,
-                            "end": node.extent.end.line,
+                            "line": loc.line,
                         }
                     )
 
@@ -112,8 +110,10 @@ def collect_functions(filename):
     return functions
 
 
+# ----------------------------
+# main
+# ----------------------------
 changed_lines = get_changed_lines()
-
 changed_functions = []
 
 for filename, lines in changed_lines.items():
@@ -124,10 +124,7 @@ for filename, lines in changed_lines.items():
     if not filename.endswith((".c", ".cc", ".cpp", ".cxx", ".h", ".hpp")):
         continue
 
-    print(
-        f"checking file={filename} changed_lines={sorted(lines)}",
-        file=sys.stderr,
-    )
+    print(f"checking file={filename} changed_lines={sorted(lines)}", file=sys.stderr)
 
     try:
         functions = collect_functions(filename)
@@ -136,19 +133,13 @@ for filename, lines in changed_lines.items():
         continue
 
     for fn in functions:
-        print(fn["name"], fn["start"], fn["end"], list(lines))
-        matched = any(
-            fn["start"] <= line <= fn["end"]
-            for line in lines
-        )
-
-        if matched:
+        # ★ 重要：関数開始行が変更行に含まれるか
+        if fn["line"] in lines:
             changed_functions.append(
                 {
                     "file": filename,
                     "function": fn["name"],
-                    "start_line": fn["start"],
-                    "end_line": fn["end"],
+                    "start_line": fn["line"],
                 }
             )
 
