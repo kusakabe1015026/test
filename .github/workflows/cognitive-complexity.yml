@@ -64,8 +64,9 @@ jobs:
 
       - name: Comment PR
         env:
-          GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           echo "===== Before comment_pr.py ====="
           pwd
@@ -73,6 +74,7 @@ jobs:
           ls -l changed_functions.json
           wc -c changed_functions.json
           cat changed_functions.json
+          cat complexity.json
           echo "================================"
 
           python3 tools/comment_pr.py complexity.json
