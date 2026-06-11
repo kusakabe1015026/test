@@ -2,33 +2,57 @@ import json
 import os
 import subprocess
 import sys
+from clang.cindex import CursorKind, Index
+import pathlib
 
-from clang.cindex import CursorKind
-from clang.cindex import Index
 
 base_sha = sys.argv[1]
 head_sha = sys.argv[2]
 
+WORKSPACE = pathlib.Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+
+# ★ 追加：解析対象ディレクトリ（repo rootからの相対）
+# 例: "src include"
+TARGET_DIRS = os.environ.get("TARGET_DIRS", "").split()
+TARGET_DIRS = [d.strip().strip("/") for d in TARGET_DIRS if d.strip()]
+
+
+def is_target_file(repo_path: str) -> bool:
+    if not TARGET_DIRS:
+        return True
+
+    return any(
+        repo_path == d or repo_path.startswith(d + "/")
+        for d in TARGET_DIRS
+    )
+
+
+def to_repo_path(path: str) -> str:
+    p = pathlib.Path(path)
+
+    if path.startswith("a/") or path.startswith("b/"):
+        path = path[2:]
+        p = pathlib.Path(path)
+
+    try:
+        p = p.resolve()
+        return str(p.relative_to(WORKSPACE)).replace("\\", "/")
+    except Exception:
+        return str(path).replace("\\", "/")
+
 
 def get_changed_lines():
     diff = subprocess.check_output(
-        [
-            "git",
-            "diff",
-            "--unified=0",
-            base_sha,
-            head_sha,
-        ],
+        ["git", "diff", "--unified=0", base_sha, head_sha],
         text=True,
     )
 
     result = {}
-
     current_file = None
 
     for line in diff.splitlines():
         if line.startswith("+++ b/"):
-            current_file = line[6:]
+            current_file = to_repo_path(line[6:])
             result.setdefault(current_file, set())
             continue
 
@@ -51,7 +75,6 @@ def get_changed_lines():
             result[current_file].add(n)
 
     print("changed_lines=", result, file=sys.stderr)
-
     return result
 
 
@@ -63,46 +86,35 @@ def collect_functions(filename):
 
     functions = []
 
-    abs_filename = os.path.abspath(filename)
-
     def walk(node):
         if node.location.file is None:
             for child in node.get_children():
                 walk(child)
             return
 
-        node_file = os.path.abspath(node.location.file.name)
+        node_file = to_repo_path(node.location.file.name)
 
-        if node_file == abs_filename:
+        if node_file == filename:
             if node.kind in (
                 CursorKind.FUNCTION_DECL,
                 CursorKind.CXX_METHOD,
                 CursorKind.CONSTRUCTOR,
                 CursorKind.DESTRUCTOR,
             ):
-                fn = {
-                    "name": node.spelling,
-                    "start": node.extent.start.line,
-                    "end": node.extent.end.line,
-                }
-
-                print(
-                    f"function found: {fn}",
-                    file=sys.stderr,
+                functions.append(
+                    {
+                        "name": node.spelling,
+                        "start": node.extent.start.line,
+                        "end": node.extent.end.line,
+                    }
                 )
-
-                functions.append(fn)
 
         for child in node.get_children():
             walk(child)
 
     walk(tu.cursor)
 
-    print(
-        f"{filename}: {len(functions)} functions",
-        file=sys.stderr,
-    )
-
+    print(f"{filename}: {len(functions)} functions", file=sys.stderr)
     return functions
 
 
@@ -111,13 +123,13 @@ changed_lines = get_changed_lines()
 changed_functions = []
 
 for filename, lines in changed_lines.items():
-    if not (
-        filename.endswith(".c")
-        or filename.endswith(".cc")
-        or filename.endswith(".cpp")
-        or filename.endswith(".cxx")
-        or filename.endswith(".h")
-        or filename.endswith(".hpp")
+
+    # ★ここが本体：ディレクトリフィルタ
+    if not is_target_file(filename):
+        continue
+
+    if not filename.endswith(
+        (".c", ".cc", ".cpp", ".cxx", ".h", ".hpp")
     ):
         continue
 
@@ -129,23 +141,13 @@ for filename, lines in changed_lines.items():
     try:
         functions = collect_functions(filename)
     except Exception as e:
-        print(
-            f"ERROR parsing {filename}: {e}",
-            file=sys.stderr,
-        )
+        print(f"ERROR parsing {filename}: {e}", file=sys.stderr)
         continue
 
     for fn in functions:
         matched = any(
             fn["start"] <= line <= fn["end"]
             for line in lines
-        )
-
-        print(
-            f"function={fn['name']} "
-            f"range={fn['start']}-{fn['end']} "
-            f"matched={matched}",
-            file=sys.stderr,
         )
 
         if matched:

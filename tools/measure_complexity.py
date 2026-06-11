@@ -96,8 +96,8 @@ def is_changed(r, changed_map):
     if file not in changed_map:
         return False
 
-    for start, end, name in changed_map[file]:
-        if r["function"] == name and start <= r["line"] <= end:
+    for start, end, _ in changed_map[file]:
+        if start <= r["line"] <= end:
             return True
 
     return False
