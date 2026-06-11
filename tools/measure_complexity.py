@@ -1,39 +1,47 @@
 import json
 import pathlib
-import re
 import subprocess
-
-import os
 import sys
+import re
+import os
 
-print("ARG =", sys.argv)
-print("PWD =", os.getcwd())
-print("compile_commands.json exists =", os.path.exists("compile_commands.json"))
 
-def load_sources():
-    with open("compile_commands.json", encoding="utf-8") as f:
+COMPILE_DB = pathlib.Path("build/compile_commands.json")
+OUTPUT_FILE = "complexity.json"
+
+
+def normalize(p):
+    return os.path.basename(str(p))
+
+
+def load_changed(path):
+    with open(path, encoding="utf-8") as f:
+        return json.load(f)
+
+
+def load_compile_db():
+    with open(COMPILE_DB, encoding="utf-8") as f:
         db = json.load(f)
 
-    return sorted(
-        {
-            entry["file"]
-            for entry in db
-            if pathlib.Path(entry["file"]).suffix.lower()
-            in (".c", ".cc", ".cpp", ".cxx", ".c++")
-        }
-    )
+    file_map = {}
+    for e in db:
+        file_map[normalize(e["file"])] = e["file"]
+
+    return file_map
 
 
 def run_clang_tidy(file_path):
+    cmd = [
+        "clang-tidy",
+        file_path,
+        "-p",
+        "build",
+        "-checks=readability-function-cognitive-complexity",
+        "-config={CheckOptions: [{key: readability-function-cognitive-complexity.Threshold, value: \"0\"}]}",
+    ]
+
     result = subprocess.run(
-        [
-            "clang-tidy",
-            file_path,
-            "-p",
-            ".",
-            "-checks=readability-function-cognitive-complexity",
-            "-config={CheckOptions: [{key: readability-function-cognitive-complexity.Threshold, value: \"0\"}]}",
-        ],
+        cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -41,37 +49,52 @@ def run_clang_tidy(file_path):
         errors="replace",
     )
 
-    print("stdout=", result.stdout)
-
     return result.stdout
 
 
-def parse_complexity(output):
-    return [
-        {
+pattern = re.compile(
+    r"function '([^']+)' has cognitive complexity of (\d+)"
+)
+
+
+def parse(output, file_path):
+    out = []
+    for m in pattern.finditer(output):
+        out.append({
+            "file": file_path,
             "function": m.group(1),
             "complexity": int(m.group(2)),
-        }
-        for m in re.finditer(
-            r"function '([^']+)' has cognitive complexity of (\d+)",
-            output,
-        )
-    ]
+        })
+    return out
 
 
-def collect_complexity():
+def main():
+    changed = load_changed(sys.argv[1])
+
+    changed_files = {normalize(f["file"]) for f in changed}
+
+    file_map = load_compile_db()
+
     results = []
 
-    sources = load_sources()
+    for f in changed_files:
+        if f not in file_map:
+            continue
 
-    for src in sources:
-        for item in parse_complexity(run_clang_tidy(src)):
-            item["file"] = src
-            results.append(item)
+        real = file_map[f]
 
-    print("=== RESULTS DEBUG ===")
-    print(results)
-    print("COUNT =", len(results))
+        print(f"[TIDY] {real}", file=sys.stderr)
 
-    return results
+        out = run_clang_tidy(real)
+        results.extend(parse(out, real))
+
+    # ★重要：ここで必ずファイル出力
+    with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=2)
+
+    print(f"[INFO] wrote {OUTPUT_FILE} ({len(results)} entries)", file=sys.stderr)
+
+
+if __name__ == "__main__":
+    main()
 

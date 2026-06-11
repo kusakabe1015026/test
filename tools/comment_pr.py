@@ -3,18 +3,25 @@ import os
 import subprocess
 import sys
 
-with open(sys.argv[1]) as f:
+
+path = sys.argv[1]
+
+if not os.path.exists(path):
+    print("complexity.json not found")
+    sys.exit(0)
+
+with open(path) as f:
     functions = json.load(f)
 
-body = "## Changed Functions\n\n"
+body = "## Cognitive Complexity Report\n\n"
 
 if not functions:
-    body += "No changed functions detected.\n"
+    body += "No warnings.\n"
 else:
     for fn in functions:
         body += (
             f"- `{fn['function']}` "
-            f"({fn['file']}:{fn['start_line']})\n"
+            f"({fn['file']}) complexity={fn['complexity']}\n"
         )
 
 subprocess.run(

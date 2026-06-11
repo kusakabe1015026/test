@@ -53,11 +53,14 @@ jobs:
           cat changed_functions.json
           echo "=================================="
 
+      - name: CMake configure (generate compile_commands.json)
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
       - name: Measure complexity
         run: |
-          python3 tools/measure_complexity.py \
-            changed_functions.json \
-            > complexity.json
+          python3 tools/measure_complexity.py changed_functions.json
 
       - name: Comment PR
         env:
