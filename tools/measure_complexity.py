@@ -35,6 +35,8 @@ def run_clang_tidy(file_path):
         errors="replace",
     )
 
+    print("stdout=", result.stdout)
+
     return result.stdout
 
 
@@ -60,6 +62,10 @@ def collect_complexity():
         for item in parse_complexity(run_clang_tidy(src)):
             item["file"] = src
             results.append(item)
+
+    print("=== RESULTS DEBUG ===")
+    print(results)
+    print("COUNT =", len(results))
 
     return results
 
