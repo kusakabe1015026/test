@@ -3,10 +3,17 @@ import pathlib
 import subprocess
 import sys
 import re
+import os
 
 
 # --------------------------------------------------
-# load changed functions
+# config
+# --------------------------------------------------
+COMPILE_DB = pathlib.Path("build/compile_commands.json")
+
+
+# --------------------------------------------------
+# changed functions load
 # --------------------------------------------------
 def load_changed_functions(path):
     with open(path, encoding="utf-8") as f:
@@ -14,27 +21,37 @@ def load_changed_functions(path):
 
 
 # --------------------------------------------------
-# load compile database sources (for validation only)
+# normalize path (CI-safe)
+# --------------------------------------------------
+def normalize_path(p):
+    return os.path.basename(str(p))
+
+
+# --------------------------------------------------
+# load compile_commands.json
 # --------------------------------------------------
 def load_compile_db_sources():
-    with open("build/compile_commands.json", encoding="utf-8") as f:
+    if not COMPILE_DB.exists():
+        raise FileNotFoundError(f"{COMPILE_DB} not found")
+
+    with open(COMPILE_DB, encoding="utf-8") as f:
         db = json.load(f)
 
     return {
-        entry["file"]
+        normalize_path(entry["file"])
         for entry in db
     }
 
 
 # --------------------------------------------------
-# run clang-tidy on single file
+# run clang-tidy
 # --------------------------------------------------
 def run_clang_tidy(file_path):
     cmd = [
         "clang-tidy",
         file_path,
         "-p",
-        ".",
+        "build",
         "-checks=readability-function-cognitive-complexity",
         "-config={CheckOptions: [{key: readability-function-cognitive-complexity.Threshold, value: \"0\"}]}",
     ]
@@ -75,25 +92,22 @@ def parse(output, file_path):
 
 
 # --------------------------------------------------
-# main logic
+# main
 # --------------------------------------------------
 def main():
     changed = load_changed_functions(sys.argv[1])
 
-    if not changed:
-        print("[]")
-        return
+    print(f"[INFO] changed functions = {len(changed)}", file=sys.stderr)
 
-    # 対象ファイルだけ抽出
+    # changed files (basename化)
     changed_files = {
-        fn["file"] for fn in changed
+        normalize_path(fn["file"])
+        for fn in changed
     }
-
-    print(f"[INFO] changed files = {len(changed_files)}", file=sys.stderr)
 
     compile_sources = load_compile_db_sources()
 
-    # compile DBに存在するものだけ実行
+    # clang-tidy対象
     targets = [
         f for f in changed_files
         if f in compile_sources
@@ -103,35 +117,47 @@ def main():
 
     all_results = []
 
-    # ファイル単位で解析（ここが最適化ポイント）
+    # フルパス復元（compile DBから）
+    with open(COMPILE_DB, encoding="utf-8") as f:
+        db = json.load(f)
+
+    file_map = {}
+    for entry in db:
+        file_map[normalize_path(entry["file"])] = entry["file"]
+
+    # clang-tidy実行
     for f in targets:
-        print(f"[TIDY] {f}", file=sys.stderr)
+        real_path = file_map.get(f)
+        if not real_path:
+            continue
 
-        output = run_clang_tidy(f)
+        print(f"[TIDY] {real_path}", file=sys.stderr)
 
-        all_results.extend(parse(output, f))
+        output = run_clang_tidy(real_path)
+        all_results.extend(parse(output, real_path))
 
-    # changed_functions と突合（関数名ベース）
-    filtered = []
+    # --------------------------------------------------
+    # match changed functions
+    # --------------------------------------------------
+    output = []
 
     for fn in changed:
         file = fn["file"]
         name = fn["function"]
 
         for r in all_results:
-            if r["file"] != file:
+            if normalize_path(r["file"]) != normalize_path(file):
                 continue
 
             if r["function"] == name:
-                filtered.append(
+                output.append(
                     {
                         **fn,
                         "complexity": r["complexity"],
                     }
                 )
 
-    # output to stdout
-    print(json.dumps(filtered, indent=2))
+    print(json.dumps(output, indent=2))
 
 
 if __name__ == "__main__":
