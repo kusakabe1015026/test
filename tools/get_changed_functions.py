@@ -142,10 +142,12 @@ def collect_functions(filename):
                 CursorKind.CONSTRUCTOR,
                 CursorKind.DESTRUCTOR,
             ):
-                print(
-                    f"{node.kind} {node.spelling}",
-                    file=sys.stderr,
-                )
+                if node_file == filename and "emitter.cpp" in filename:
+                    print(
+                        f"kind={node.kind} spelling={node.spelling} "
+                        f"line={node.location.line}",
+                        file=sys.stderr,
+                    )
                 functions.append(
                     {
                         "name": node.spelling,
