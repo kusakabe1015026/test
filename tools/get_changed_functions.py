@@ -77,6 +77,8 @@ def get_changed_lines():
             start = int(start_count)
             count = 1
 
+        count = max(count, 1)
+
         for n in range(start, start + count):
             result[current_file].add(n)
 
