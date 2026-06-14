@@ -130,12 +130,12 @@ def collect_functions(filename):
 
         node_file = to_repo_path(node.location.file.name)
 
-        print(
-            f"node_file={node_file} filename={filename}",
-            file=sys.stderr,
-        )
 
         if node_file == filename:
+            print(
+                f"node_kind={node.kind}",
+                file=sys.stderr,
+            )
             if node.kind in (
                 CursorKind.FUNCTION_DECL,
                 CursorKind.CXX_METHOD,
