@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 from clang.cindex import CursorKind, Index
+from clang.cindex import CompilationDatabase
 import pathlib
 
 
@@ -80,6 +81,8 @@ def get_changed_lines():
 
 def collect_functions(filename):
     print(f"parsing {filename}", file=sys.stderr)
+
+    cdb = CompilationDatabase.fromDirectory("build")
 
     index = Index.create()
     tu = index.parse(filename)
