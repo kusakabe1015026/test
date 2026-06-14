@@ -89,20 +89,32 @@ def collect_functions(filename):
 
     for cmd in commands:
         args = list(cmd.arguments)
+        filtered_args = []
+        skip_next = False
+        for arg in args[1:]:
+            if skip_next:
+                skip_next = False
+                continue
+
+            if arg == "-o":
+                skip_next = True
+                continue
+
+            if arg == "-c":
+                continue
+
+            if arg == abs_file:
+                continue
+
+            filtered_args.append(arg)
 
         print("filename =", filename, file=sys.stderr)
         print("abs_file =", abs_file, file=sys.stderr)
         print("args =", args, file=sys.stderr)
+        print("filetered_args =", filtered_args, file=sys.stderr)
 
         index = Index.create()
-        tu = index.parse(
-            abs_file,
-            args=[
-                "-std=gnu++11",
-                "-I/home/runner/work/test/test/include",
-                "-I/home/runner/work/test/test/src",
-            ]
-        )
+        tu = index.parse(abs_file, args=filtered_args)
         break
 
     for diag in tu.diagnostics:
