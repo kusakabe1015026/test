@@ -187,6 +187,17 @@ for filename, lines in changed_lines.items():
         traceback.print_exc(file=sys.stderr)
         continue
 
+    print(
+        f"changed lines={sorted(lines)}",
+        file=sys.stderr,
+    )
+
+    for fn in functions:
+        print(
+            f'{fn["name"]}: {fn["start"]}-{fn["end"]}',
+            file=sys.stderr,
+        )
+
     for fn in functions:
         matched = any(
             fn["start"] <= line <= fn["end"]
