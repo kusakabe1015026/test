@@ -102,6 +102,7 @@ def collect_functions(filename):
                 "-I/home/runner/work/test/test/include",
                 "-I/home/runner/work/test/test/src",
             ]
+        )
         break
 
     for diag in tu.diagnostics:
