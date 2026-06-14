@@ -95,7 +95,13 @@ def collect_functions(filename):
         print("args =", args, file=sys.stderr)
 
         index = Index.create()
-        tu = index.parse(abs_file, args=args[1:])
+        tu = index.parse(
+            abs_file,
+            args=[
+                "-std=gnu++11",
+                "-I/home/runner/work/test/test/include",
+                "-I/home/runner/work/test/test/src",
+            ]
         break
 
     for diag in tu.diagnostics:
