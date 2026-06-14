@@ -27,6 +27,7 @@ Tag::Tag(const Token& token)
     default:
       assert(false);
   }
+
 }
 
 std::string Tag::Translate(const Directives& directives) {
