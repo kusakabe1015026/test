@@ -5,6 +5,7 @@ import sys
 from clang.cindex import CursorKind, Index
 from clang.cindex import CompilationDatabase
 import pathlib
+import traceback
 
 
 base_sha = sys.argv[1]
@@ -160,8 +161,8 @@ for filename, lines in changed_lines.items():
 
     try:
         functions = collect_functions(filename)
-    except Exception as e:
-        print(f"ERROR parsing {filename}: {e}", file=sys.stderr)
+    except Exception:
+        traceback.print_exc(file=sys.stderr)
         continue
 
     for fn in functions:
