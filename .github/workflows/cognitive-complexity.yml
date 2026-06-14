@@ -40,6 +40,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y clang python3-clang
 
+      - name: CMake configure (generate compile_commands.json)
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
       - name: Get changed functions
         env:
           TARGET_DIRS: "src"
@@ -54,11 +59,6 @@ jobs:
           wc -c changed_functions.json
           cat changed_functions.json
           echo "=================================="
-
-      - name: CMake configure (generate compile_commands.json)
-        run: |
-          cmake -S . -B build \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
       - name: Measure complexity
         run: |
