@@ -43,7 +43,9 @@ jobs:
       - name: CMake configure (generate compile_commands.json)
         run: |
           cmake -S . -B build \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++
 
       - name: Get changed functions
         env:
