@@ -101,6 +101,10 @@ def collect_functions(filename):
                 CursorKind.CONSTRUCTOR,
                 CursorKind.DESTRUCTOR,
             ):
+                print(
+                    f"{node.kind} {node.spelling}",
+                    file=sys.stderr,
+                )
                 functions.append(
                     {
                         "name": node.spelling,
