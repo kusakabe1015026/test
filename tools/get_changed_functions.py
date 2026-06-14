@@ -3,7 +3,9 @@ import os
 import subprocess
 import sys
 from clang.cindex import CursorKind, Index
+from clang.cindex import CompilationDatabase
 import pathlib
+import traceback
 
 
 base_sha = sys.argv[1]
@@ -51,6 +53,10 @@ def get_changed_lines():
     current_file = None
 
     for line in diff.splitlines():
+        if line.startswith("@@"):
+            print(f"HUNK: {line}", file=sys.stderr)
+
+    for line in diff.splitlines():
         if line.startswith("+++ b/"):
             current_file = to_repo_path(line[6:])
             result.setdefault(current_file, set())
@@ -71,6 +77,8 @@ def get_changed_lines():
             start = int(start_count)
             count = 1
 
+        count = max(count, 1)
+
         for n in range(start, start + count):
             result[current_file].add(n)
 
@@ -81,8 +89,42 @@ def get_changed_lines():
 def collect_functions(filename):
     print(f"parsing {filename}", file=sys.stderr)
 
-    index = Index.create()
-    tu = index.parse(filename)
+    abs_file = str((WORKSPACE / filename).resolve())
+    cdb = CompilationDatabase.fromDirectory("build")
+    commands = cdb.getCompileCommands(abs_file)
+
+    for cmd in commands:
+        args = list(cmd.arguments)
+        filtered_args = []
+        skip_next = False
+        for arg in args[1:]:
+            if skip_next:
+                skip_next = False
+                continue
+
+            if arg == "-o":
+                skip_next = True
+                continue
+
+            if arg == "-c":
+                continue
+
+            if arg == abs_file:
+                continue
+
+            filtered_args.append(arg)
+
+        print("filename =", filename, file=sys.stderr)
+        print("abs_file =", abs_file, file=sys.stderr)
+        print("args =", args, file=sys.stderr)
+        print("filetered_args =", filtered_args, file=sys.stderr)
+
+        index = Index.create()
+        tu = index.parse(abs_file, args=filtered_args)
+        break
+
+    for diag in tu.diagnostics:
+        print(diag, file=sys.stderr)
 
     functions = []
 
@@ -94,6 +136,7 @@ def collect_functions(filename):
 
         node_file = to_repo_path(node.location.file.name)
 
+
         if node_file == filename:
             if node.kind in (
                 CursorKind.FUNCTION_DECL,
@@ -101,6 +144,12 @@ def collect_functions(filename):
                 CursorKind.CONSTRUCTOR,
                 CursorKind.DESTRUCTOR,
             ):
+                if node_file == filename and "emitter.cpp" in filename:
+                    print(
+                        f"kind={node.kind} spelling={node.spelling} "
+                        f"line={node.location.line}",
+                        file=sys.stderr,
+                    )
                 functions.append(
                     {
                         "name": node.spelling,
@@ -140,9 +189,20 @@ for filename, lines in changed_lines.items():
 
     try:
         functions = collect_functions(filename)
-    except Exception as e:
-        print(f"ERROR parsing {filename}: {e}", file=sys.stderr)
+    except Exception:
+        traceback.print_exc(file=sys.stderr)
         continue
+
+    print(
+        f"changed lines={sorted(lines)}",
+        file=sys.stderr,
+    )
+
+    for fn in functions:
+        print(
+            f'{fn["name"]}: {fn["start"]}-{fn["end"]}',
+            file=sys.stderr,
+        )
 
     for fn in functions:
         matched = any(

@@ -61,6 +61,7 @@ bool convert<bool>::decode(const Node& node, bool& rhs) {
     if (name.truename == tolower(node.Scalar())) {
       rhs = true;
       return true;
+
     }
 
     if (name.falsename == tolower(node.Scalar())) {

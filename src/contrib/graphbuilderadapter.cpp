@@ -16,7 +16,6 @@ void GraphBuilderAdapter::OnNull(const Mark &mark, anchor_t anchor) {
 
 void GraphBuilderAdapter::OnAlias(const Mark &mark, anchor_t anchor) {
   void *pReffedNode = m_anchors.Get(anchor);
-//
   DispositionNode(m_builder.AnchorReference(mark, pReffedNode));
 }
 

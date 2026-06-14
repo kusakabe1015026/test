@@ -142,6 +142,7 @@ def main():
 
         out = run_clang_tidy(real)
         results.extend(parse(out))
+        print(out, file=sys.stderr)
 
     # ----------------------------
     # FINAL FILTER (ここが本体)
