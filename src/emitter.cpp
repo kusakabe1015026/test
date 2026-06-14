@@ -67,6 +67,8 @@ bool Emitter::SetMapFormat(EMITTER_MANIP value) {
     ok = true;
   if (m_pState->SetMapKeyFormat(value, FmtScope::Global))
     ok = true;
+  else
+    ok = false;
 //
   return ok;
 }

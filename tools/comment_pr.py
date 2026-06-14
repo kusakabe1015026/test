@@ -2,21 +2,21 @@ import json
 import os
 import subprocess
 import sys
+import pathlib
 
 
 REPO = os.environ["GITHUB_REPOSITORY"]
 SHA = os.environ["GITHUB_SHA"]
 PR_NUMBER = os.environ["PR_NUMBER"]
+WORKSPACE = pathlib.Path(os.environ["GITHUB_WORKSPACE"]).resolve()
 
 
 def to_repo_path(path):
-    path = str(path)
-
-    marker = "/src/"
-    if marker in path:
-        return "src/" + path.split(marker, 1)[1]
-
-    return path
+    p = pathlib.Path(path).resolve()
+    try:
+        return str(p.relative_to(WORKSPACE)).replace("\\", "/")
+    except Exception:
+        return str(p).replace("\\", "/")
 
 
 def make_link(file, line):
@@ -34,11 +34,12 @@ if not functions:
     body += "No changed functions detected.\n"
 else:
     for fn in functions:
+        file_path = to_repo_path(fn["file"])
         url = make_link(fn["file"], fn["line"])
 
         body += (
             f"- [`{fn['function']}`]({url}) "
-            f"({fn['file']}:{fn['line']}) "
+            f"({file_path}:{fn['line']}) "
             f"complexity={fn['complexity']}\n"
         )
 
