@@ -87,9 +87,14 @@ def collect_functions(filename):
     commands = cdb.getCompileCommands(abs_file)
 
     for cmd in commands:
-        args = list(cmd.arguments)[1:] #コンパイラ名を除く
+        args = list(cmd.arguments)
+
+        print("filename =", filename, file=sys.stderr)
+        print("abs_file =", abs_file, file=sys.stderr)
+        print("args =", args, file=sys.stderr)
+
         index = Index.create()
-        tu = index.parse(abs_file, args=args)
+        tu = index.parse(abs_file, args=args[1:])
         break
 
     for diag in tu.diagnostics:
