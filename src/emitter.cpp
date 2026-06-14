@@ -69,7 +69,6 @@ bool Emitter::SetMapFormat(EMITTER_MANIP value) {
     ok = true;
   else
     ok = false;
-//
   return ok;
 }
 
