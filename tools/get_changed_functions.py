@@ -82,13 +82,14 @@ def get_changed_lines():
 def collect_functions(filename):
     print(f"parsing {filename}", file=sys.stderr)
 
+    abs_file = str((WORKSPACE / filename).resolve())
     cdb = CompilationDatabase.fromDirectory("build")
-    commands = cdb.getCompileCommands(filename)
+    commands = cdb.getCompileCommands(abs_file)
 
     for cmd in commands:
         args = list(cmd.arguments)[1:] #コンパイラ名を除く
         index = Index.create()
-        tu = index.parse(filename, args=args)
+        tu = index.parse(abs_file, args=args)
         break
 
     for diag in tu.diagnostics:
