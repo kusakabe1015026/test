@@ -84,6 +84,9 @@ def collect_functions(filename):
     index = Index.create()
     tu = index.parse(filename)
 
+    for diag in tu.diagnostics:
+        print(diag, file=sys.stderr)
+
     functions = []
 
     def walk(node):
