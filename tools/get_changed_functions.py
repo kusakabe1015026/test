@@ -53,6 +53,10 @@ def get_changed_lines():
     current_file = None
 
     for line in diff.splitlines():
+        if line.startswith("@@"):
+            print(f"HUNK: {line}", file=sys.stderr)
+
+    for line in diff.splitlines():
         if line.startswith("+++ b/"):
             current_file = to_repo_path(line[6:])
             result.setdefault(current_file, set())
