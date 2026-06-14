@@ -132,10 +132,6 @@ def collect_functions(filename):
 
 
         if node_file == filename:
-            print(
-                f"node_kind={node.kind}",
-                file=sys.stderr,
-            )
             if node.kind in (
                 CursorKind.FUNCTION_DECL,
                 CursorKind.CXX_METHOD,
