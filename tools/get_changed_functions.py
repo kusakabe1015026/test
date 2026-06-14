@@ -83,9 +83,13 @@ def collect_functions(filename):
     print(f"parsing {filename}", file=sys.stderr)
 
     cdb = CompilationDatabase.fromDirectory("build")
+    commands = cdb.getCompileCommands(filename)
 
-    index = Index.create()
-    tu = index.parse(filename)
+    for cmd in commands:
+        args = list(cmd.arguments)[1:] #コンパイラ名を除く
+        index = Index.create()
+        tu = index.parse(filename, args=args)
+        break
 
     for diag in tu.diagnostics:
         print(diag, file=sys.stderr)
