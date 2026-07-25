@@ -53,9 +53,9 @@ def get_changed_lines():
     if base_sha and head_sha:
         diff_cmd = ["git", "diff", "--unified=0", base_sha, head_sha]
     elif STAGED:
-        diff_cmd = ["git", "diff", "--cached", "--unified=0"]
+        diff_cmd = ["git", "diff", "--unified=0", "--cached"]
     else:
-        diff_cmd = ["git", "diff", "--unified=0"]
+        diff_cmd = ["git", "diff", "--unified=0", "HEAD"]
 
     diff = subprocess.check_output(diff_cmd, text=True)
 
@@ -235,4 +235,3 @@ with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
     json.dump(changed_functions, f, indent=2)
 
 print(f"[INFO] wrote {OUTPUT_FILE}: {len(changed_functions)} entries", file=sys.stderr)
-
