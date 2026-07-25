@@ -4,14 +4,18 @@ import subprocess
 import sys
 from clang.cindex import CursorKind, Index
 from clang.cindex import CompilationDatabase
+from clang.cindex import Config
+Config.set_library_file(r"C:\Program Files\LLVM\bin\libclang.dll")
 import pathlib
 import traceback
 
 
-base_sha = sys.argv[1]
-head_sha = sys.argv[2]
+base_sha = sys.argv[1] if len(sys.argv) > 1 else None
+head_sha = sys.argv[2] if len(sys.argv) > 2 else None
 
-WORKSPACE = pathlib.Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+WORKSPACE = pathlib.Path(
+    os.environ.get("GITHUB_WORKSPACE", ".")
+).resolve()
 
 # ★ 追加：解析対象ディレクトリ（repo rootからの相対）
 # 例: "src include"
@@ -44,10 +48,22 @@ def to_repo_path(path: str) -> str:
 
 
 def get_changed_lines():
-    diff = subprocess.check_output(
-        ["git", "diff", "--unified=0", base_sha, head_sha],
-        text=True,
-    )
+    if base_sha and head_sha:
+        diff_cmd = [
+            "git",
+            "diff",
+            "--unified=0",
+            base_sha,
+            head_sha,
+        ]
+    else:
+        diff_cmd = [
+            "git",
+            "diff",
+            "--unified=0",
+        ]
+
+    diff = subprocess.check_output(diff_cmd, text=True)
 
     result = {}
     current_file = None

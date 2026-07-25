@@ -5,10 +5,12 @@ import sys
 import pathlib
 
 
-REPO = os.environ["GITHUB_REPOSITORY"]
-SHA = os.environ["GITHUB_SHA"]
-PR_NUMBER = os.environ["PR_NUMBER"]
-WORKSPACE = pathlib.Path(os.environ["GITHUB_WORKSPACE"]).resolve()
+REPO = os.environ.get("GITHUB_REPOSITORY")
+SHA = os.environ.get("GITHUB_SHA")
+PR_NUMBER = os.environ.get("PR_NUMBER")
+WORKSPACE = pathlib.Path(
+    os.environ.get("GITHUB_WORKSPACE", ".")
+).resolve()
 
 
 def to_repo_path(path):
@@ -20,6 +22,9 @@ def to_repo_path(path):
 
 
 def make_link(file, line):
+    if not (REPO and SHA):
+        return None
+
     file = to_repo_path(file)
     return f"https://github.com/{REPO}/blob/{SHA}/{file}#L{line}"
 
@@ -37,26 +42,36 @@ else:
         file_path = to_repo_path(fn["file"])
         url = make_link(fn["file"], fn["line"])
 
-        body += (
-            f"- [`{fn['function']}`]({url}) "
-            f"({file_path}:{fn['line']}) "
-            f"complexity={fn['complexity']}\n"
-        )
+        if url:
+            body += (
+                f"- [`{fn['function']}`]({url}) "
+                f"({file_path}:{fn['line']}) "
+                f"complexity={fn['complexity']}\n"
+            )
+        else:
+            body += (
+                f"- {fn['function']} "
+                f"({file_path}:{fn['line']}) "
+                f"complexity={fn['complexity']}\n"
+            )
 
 
-env = os.environ.copy()
-env["GH_TOKEN"] = os.environ["GH_TOKEN"]
+if REPO and SHA and PR_NUMBER:
+    env = os.environ.copy()
+    env["GH_TOKEN"] = os.environ["GH_TOKEN"]
 
-subprocess.run(
-    [
-        "gh",
-        "pr",
-        "comment",
-        PR_NUMBER,
-        "--body",
-        body,
-    ],
-    check=True,
-    env=env,
-)
+    subprocess.run(
+        [
+            "gh",
+            "pr",
+            "comment",
+            PR_NUMBER,
+            "--body",
+            body,
+        ],
+        check=True,
+        env=env,
+    )
+else:
+    print(body)
 
