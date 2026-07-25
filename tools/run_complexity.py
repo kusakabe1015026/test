@@ -1,17 +1,50 @@
+import pathlib
 import subprocess
 import sys
 
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+BUILD = ROOT / "build"
+
+print("Generating compile_commands.json...")
+
+BUILD.mkdir(exist_ok=True)
+
 subprocess.run(
-    [sys.executable, "tools/get_changed_functions.py"],
+    [
+        "cmake",
+        "-S", str(ROOT),
+        "-B", str(BUILD),
+        "-G", "Ninja",
+        "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
+    ],
     check=True,
 )
 
 subprocess.run(
-    [sys.executable, "tools/measure_complexity.py", "changed_functions.json"],
+    [
+        sys.executable,
+        str(ROOT / "tools" / "get_changed_functions.py"),
+    ],
     check=True,
+    cwd=ROOT,
 )
 
 subprocess.run(
-    [sys.executable, "tools/comment_pr.py", "complexity.json"],
+    [
+        sys.executable,
+        str(ROOT / "tools" / "measure_complexity.py"),
+        str(ROOT / "changed_functions.json"),
+    ],
     check=True,
+    cwd=ROOT,
+)
+
+subprocess.run(
+    [
+        sys.executable,
+        str(ROOT / "tools" / "comment_pr.py"),
+        str(ROOT / "complexity.json"),
+    ],
+    check=True,
+    cwd=ROOT,
 )

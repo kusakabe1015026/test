@@ -1,0 +1,26 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Complexity",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "tools/run_complexity.py"
+            ]
+        },
+        {
+            "label": "Complexity (Staged Only)",
+            "type": "shell",
+            "command": "python",
+            "args": [
+                "tools/run_complexity.py"
+            ],
+            "options": {
+                "env": {
+                    "STAGED_ONLY": "1"
+                }
+            }
+        }
+    ]
+}
