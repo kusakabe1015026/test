@@ -1,0 +1,56 @@
+name: Automatic Cherry-pick
+
+on:
+  # main への merge 完了を入口にする。closed だけでは未merge PRも発火するため、
+  # job 側で merged == true を確認する。
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        # ラベル付与が merge 後になった場合や、失敗後の再実行に使う。
+        description: "処理対象のPR番号"
+        required: true
+        type: string
+
+concurrency:
+  # 同じ対象ブランチを複数の Actions が同時に書き換えると、push の競合や
+  # 二重反映が起きるため、リポジトリ単位で待ち合わせる。
+  group: ${{ github.repository }}-auto-cherry-pick
+  cancel-in-progress: false
+
+jobs:
+  auto-cherry-pick:
+    # workflow_dispatch は明示的な再実行なので通し、PRイベントではmerge済みだけ通す。
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          # GITHUB_TOKEN の権限制限に依存せず、対象ブランチへの直接pushと
+          # workflowファイルを含む変更のpushを可能にするため、SSO済みPATを使う。
+          token: ${{ secrets.AUTO_CHERRY_PICK_ACTIONS_TOKEN }}
+          persist-credentials: true
+
+      - name: Run automatic cherry-pick
+        env:
+          # APIのPR取得・コメント投稿とGit pushを同じPATで行う。
+          GH_TOKEN: ${{ secrets.AUTO_CHERRY_PICK_ACTIONS_TOKEN }}
+          GH_API_URL: ${{ github.api_url }}
+          GH_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_number || github.event.pull_request.number }}
+        run: |
+          # 複数ラベルの結果をPythonが集計し、1件でも失敗した場合は
+          # workflowも失敗させる。
+          set -eu
+          python3 900_Scripts/cherry_pick/auto_cherry_pick.py \
+            --pr-number "$PR_NUMBER"
