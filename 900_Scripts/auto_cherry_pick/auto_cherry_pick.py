@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import sys
+import shlex
 import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence
@@ -38,7 +39,14 @@ def run_command(
     input_text: Optional[str] = None,
 ) -> str:
     """Run a command and return its standard output."""
-    # Git 操作を一箇所に集約し、失敗時に stderr を Actions のログへ残す。
+    command_text = shlex.join(list(command))
+
+    print(
+        "running command: cwd={} command={}".format(cwd, command_text),
+        file=sys.stderr,
+        flush=True,
+    )
+
     result = subprocess.run(
         list(command),
         cwd=str(cwd),
@@ -48,14 +56,42 @@ def run_command(
         stderr=subprocess.PIPE,
         check=False,
     )
-    if check and result.returncode != 0:
-        detail = result.stderr.strip() or result.stdout.strip()
-        raise CommandError(
-            "command failed ({}): {}\n{}".format(
-                result.returncode, " ".join(command), detail
-            )
+
+    stdout = result.stdout.strip()
+    stderr = result.stderr.strip()
+
+    if result.returncode != 0:
+        print(
+            "command failed: cwd={} returncode={} command={}".format(
+                cwd,
+                result.returncode,
+                command_text,
+            ),
+            file=sys.stderr,
+            flush=True,
         )
-    return result.stdout.strip()
+        print(
+            "command stdout:\n{}".format(stdout or "<empty>"),
+            file=sys.stderr,
+            flush=True,
+        )
+        print(
+            "command stderr:\n{}".format(stderr or "<empty>"),
+            file=sys.stderr,
+            flush=True,
+        )
+
+        if check:
+            raise CommandError(
+                "command failed ({}): {}\nstdout:\n{}\nstderr:\n{}".format(
+                    result.returncode,
+                    command_text,
+                    stdout or "<empty>",
+                    stderr or "<empty>",
+                )
+            )
+
+    return stdout
 
 
 def git_remote_branch_exists(repository: Path, branch: str) -> bool:
@@ -274,7 +310,6 @@ def process_version(
     # 1つの Version ラベルの処理を独立させる。呼び出し側は例外を結果に変換し、
     # ある版の失敗で別の版の処理まで止めない。
     target_branch = resolve_target_branch(repository, version)
-    print("target branch: {}".format(target_branch), file=sys.stderr)
     remote_ref = "refs/remotes/origin/{}".format(target_branch)
     run_command(
         [
@@ -303,12 +338,10 @@ def process_version(
     # 複数ラベルを順番に処理しても、次の処理へ作業ツリーの状態を持ち越さない。
     worktree = Path(tempfile.mkdtemp(prefix="auto-cherry-pick-"))
     try:
-        print("1");
         run_command(
             ["git", "worktree", "add", "--detach", str(worktree), remote_ref],
             repository,
         )
-        print("2");
         try:
             run_command(["git", "cherry-pick", "-x", source_commit], worktree)
         except CommandError as exc:
@@ -329,15 +362,12 @@ def process_version(
             print("git cherry-pick failed for {} on {}:".format(source_commit, target_branch), file=sys.stderr)
             run_command(["git", "status", "--short"], worktree, check=False)
             raise
-        print("3");
         run_command(
             ["git", "push", "origin", "HEAD:refs/heads/{}".format(target_branch)],
             worktree,
         )
-        print("4");
         # push 後の SHA を PR コメントに残し、出荷対象と反映結果を追跡できるようにする。
         pushed_commit = run_command(["git", "rev-parse", "HEAD"], worktree)
-        print("5");
         return {
             "status": "SUCCESS",
             "version": version,
@@ -420,7 +450,6 @@ def parse_arguments() -> argparse.Namespace:
 
 def main() -> int:
     """Run the automatic cherry-pick process."""
-    print("called main", file=sys.stderr)
     # workflow はイベント処理だけを担当し、実際の対象判定と Git 操作はこの入口から
     # 同じコードパスで実行する。自動実行と手動実行の挙動を一致させるためである。
     arguments = parse_arguments()
