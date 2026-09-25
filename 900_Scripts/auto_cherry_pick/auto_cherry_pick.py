@@ -395,6 +395,7 @@ def parse_arguments() -> argparse.Namespace:
 
 def main() -> int:
     """Run the automatic cherry-pick process."""
+    print("called main", file=sys.stderr)
     # workflow はイベント処理だけを担当し、実際の対象判定と Git 操作はこの入口から
     # 同じコードパスで実行する。自動実行と手動実行の挙動を一致させるためである。
     arguments = parse_arguments()
