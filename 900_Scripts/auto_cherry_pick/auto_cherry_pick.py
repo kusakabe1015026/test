@@ -274,6 +274,7 @@ def process_version(
     # 1つの Version ラベルの処理を独立させる。呼び出し側は例外を結果に変換し、
     # ある版の失敗で別の版の処理まで止めない。
     target_branch = resolve_target_branch(repository, version)
+    print("target branch: {}"target_branch, file=sys.stderr)
     remote_ref = "refs/remotes/origin/{}".format(target_branch)
     run_command(
         [
