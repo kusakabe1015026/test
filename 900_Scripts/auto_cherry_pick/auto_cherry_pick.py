@@ -310,6 +310,26 @@ def process_version(
         )
         print("2");
         run_command(["git", "cherry-pick", "-x", source_commit], worktree)
+        try:
+            run_command(["git", "cherry-pick", "-x", source_commit], worktree)
+        except CommandError as exc:
+            # 既に同じ変更が入っている/空コミットになっているケース
+            msg = str(exc).lower()
+            if "nothing to commit" in msg or "the previous cherry-pick is now empty" in msg:
+                run_command(["git", "cherry-pick", "--abort"], worktree, check=False)
+                return {
+                    "status": "SKIP",
+                    "version": version,
+                    "branch": target_branch,
+                    "source": source_commit,
+                    "commit": "",
+                    "reason": "the source commit is already applied or resolves to an empty patch",
+                }
+
+            # conflict のときは実際のエラーを残す
+            print("git cherry-pick failed for {} on {}:".format(source_commit, target_branch), file=sys.stderr)
+            run_command(["git", "status", "--short"], worktree, check=False)
+            raise
         print("3");
         run_command(
             ["git", "push", "origin", "HEAD:refs/heads/{}".format(target_branch)],
