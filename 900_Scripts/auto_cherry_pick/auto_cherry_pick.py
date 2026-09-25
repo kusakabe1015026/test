@@ -369,15 +369,15 @@ def comment_for_result(result: Dict[str, str]) -> str:
             "## Automatic cherry-pick: SUCCESS\n\n"
             "- Version label: `Version/{version}`\n"
             "- Target branch: `{branch}`\n"
-            "- Source squash commit: `{source}`\n"
-            "- Pushed commit: `{commit}`"
+            "- Source squash commit: {source}\n"
+            "- Pushed commit: {commit}"
         ).format(**result)
     if status == "SKIP":
         return (
             "## Automatic cherry-pick: SKIP\n\n"
             "- Version label: `Version/{version}`\n"
             "- Target branch: `{branch}`\n"
-            "- Source commit: `{source}`\n"
+            "- Source commit: {source}\n"
             "- Reason: {reason}"
         ).format(**result)
     if status == "WARNING":
@@ -390,7 +390,7 @@ def comment_for_result(result: Dict[str, str]) -> str:
         "## Automatic cherry-pick: ERROR\n\n"
         "- Version label: `Version/{version}`\n"
         "- Target branch: `{branch}`\n"
-        "- Source commit: `{source}`\n"
+        "- Source commit: {source}\n"
         "- Reason: {reason}\n"
         "- Manual intervention is required."
     ).format(**result)
