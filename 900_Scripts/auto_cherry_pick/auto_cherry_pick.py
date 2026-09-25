@@ -303,22 +303,22 @@ def process_version(
     # 複数ラベルを順番に処理しても、次の処理へ作業ツリーの状態を持ち越さない。
     worktree = Path(tempfile.mkdtemp(prefix="auto-cherry-pick-"))
     try:
-	print("1");
+        print("1");
         run_command(
             ["git", "worktree", "add", "--detach", str(worktree), remote_ref],
             repository,
         )
-	print("2");
+        print("2");
         run_command(["git", "cherry-pick", "-x", source_commit], worktree)
-	print("3");
+        print("3");
         run_command(
             ["git", "push", "origin", "HEAD:refs/heads/{}".format(target_branch)],
             worktree,
         )
-	print("4");
+        print("4");
         # push 後の SHA を PR コメントに残し、出荷対象と反映結果を追跡できるようにする。
         pushed_commit = run_command(["git", "rev-parse", "HEAD"], worktree)
-	print("5");
+        print("5");
         return {
             "status": "SUCCESS",
             "version": version,
