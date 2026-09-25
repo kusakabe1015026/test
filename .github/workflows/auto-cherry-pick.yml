@@ -51,6 +51,6 @@ jobs:
         run: |
           # 複数ラベルの結果をPythonが集計し、1件でも失敗した場合は
           # workflowも失敗させる。
-          set -eu
+          set -euxo pipefail
           python3 900_Scripts/auto_cherry_pick/auto_cherry_pick.py \
             --pr-number "$PR_NUMBER"
