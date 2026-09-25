@@ -52,5 +52,8 @@ jobs:
           # 複数ラベルの結果をPythonが集計し、1件でも失敗した場合は
           # workflowも失敗させる。
           set -euxo pipefail
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           python3 900_Scripts/auto_cherry_pick/auto_cherry_pick.py \
             --pr-number "$PR_NUMBER"
