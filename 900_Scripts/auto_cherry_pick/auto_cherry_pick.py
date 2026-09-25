@@ -309,7 +309,6 @@ def process_version(
             repository,
         )
         print("2");
-        run_command(["git", "cherry-pick", "-x", source_commit], worktree)
         try:
             run_command(["git", "cherry-pick", "-x", source_commit], worktree)
         except CommandError as exc:
