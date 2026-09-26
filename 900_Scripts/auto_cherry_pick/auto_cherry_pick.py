@@ -305,11 +305,11 @@ def process_version(
     repository: Path,
     source_commit: str,
     version: str,
+    target_branch: str,
 ) -> Dict[str, str]:
     """Cherry-pick one version into its existing target branch."""
     # 1つの Version ラベルの処理を独立させる。呼び出し側は例外を結果に変換し、
     # ある版の失敗で別の版の処理まで止めない。
-    target_branch = resolve_target_branch(repository, version)
     remote_ref = "refs/remotes/origin/{}".format(target_branch)
     run_command(
         [
@@ -494,7 +494,8 @@ def main() -> int:
     failed = False
     for version in versions:
         try:
-            result = process_version(repository_path, merge_sha, version)
+            target_branch = resolve_target_branch(repository, version)
+            result = process_version(repository_path, merge_sha, version, target_branch)
         except Exception as error:
             failed = True
             result = {
