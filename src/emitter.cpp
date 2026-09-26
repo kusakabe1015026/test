@@ -10,9 +10,9 @@
 namespace YAML {
 class Binary;
 struct _Null;
-//bar3
+
 Emitter::Emitter() : m_pState(new EmitterState), m_stream{} {}
-//test3
+
 Emitter::Emitter(std::ostream& stream)
     : m_pState(new EmitterState), m_stream(stream) {}
 //test4
