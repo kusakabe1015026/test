@@ -57,8 +57,8 @@ jobs:
           # workflowも失敗させる。
           set -euxo pipefail
 
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          #git config --local user.name "github-actions[bot]"
+          #git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           python3 900_Scripts/auto_cherry_pick/auto_cherry_pick.py \
             --pr-number "$PR_NUMBER"
