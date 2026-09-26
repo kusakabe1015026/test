@@ -441,7 +441,7 @@ def main() -> int:
             "version": "N/A",
             "branch": "N/A",
             "source": merge_sha,
-            "reason": "no Version/X.Y label was found",
+            "reason": "Versionラベルが見つかりませんでした",
         }
         if not post_result_comment(client, arguments.pr_number, warning):
             print("Versionラベルがない旨の警告コメントの投稿に失敗しました", file=sys.stderr)
