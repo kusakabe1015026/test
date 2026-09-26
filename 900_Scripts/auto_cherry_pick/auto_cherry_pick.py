@@ -494,7 +494,7 @@ def main() -> int:
     failed = False
     for version in versions:
         try:
-            target_branch = resolve_target_branch(repository, version)
+            target_branch = resolve_target_branch(repository_path, version)
             result = process_version(repository_path, merge_sha, version, target_branch)
         except Exception as error:
             failed = True
