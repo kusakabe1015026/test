@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""main にマージされた PR を特定のブランチへチェリーピックする。"""
+"""mainにマージされたPRを特定のブランチへcherry-pickする。"""
 
 from __future__ import annotations
 
@@ -89,9 +89,9 @@ def run_command(
 
 
 def git_remote_branch_exists(repository: Path, branch: str) -> bool:
-    """origin にブランチが存在するかを返す。"""
+    """originにcherry-pick先のブランチが存在するかを返す。"""
     # 対象ブランチはリリース担当者が手動作成するため、存在しない版を
-    # Actions が誤って作成しないよう、push 前にリモートだけを確認する。
+    # Actionsが誤って作成しないよう、push前にリモートだけを確認する。
     result = subprocess.run(
         [
             "git",
@@ -111,8 +111,8 @@ def git_remote_branch_exists(repository: Path, branch: str) -> bool:
 
 
 def already_applied(repository: Path, remote_ref: str, source_commit: str) -> bool:
-    """Actions の再実行や複数ラベル処理で同じ変更を二重反映しないための冪等性判定"""
-    # `cherry-pick -x` が残す元コミットの記録を、既反映判定に利用する。
+    """Actionsの再実行や複数ラベル処理で同じ変更を二重反映しないための冪等性判定を行う。"""
+    # `cherry-pick -x`が残す元コミットの記録を、既反映判定に利用する。
     log = run_command(
         ["git", "log", remote_ref, "--format=%B"],
         repository,
@@ -125,9 +125,9 @@ def already_applied(repository: Path, remote_ref: str, source_commit: str) -> bo
 
 
 def branch_candidates(version: str) -> List[str]:
-    """バージョンラベルに対応するブランチ候補を返す。"""
-    # 通常出図と緊急出図は同じバージョンラベルとブランチ体系で管理する。
-    # 実際に存在する候補がちょうど1つであることは resolve_target_branch で検証する。
+    """Versionラベルに対応するブランチ候補を返す。"""
+    # 通常出図と緊急出図は同じVersionラベルとブランチ体系で管理する。
+    # 実際に存在する候補がちょうど1つであることはresolve_target_branchで検証する。
     return [
         "verify-e2e/v{}".format(version),
         "pre-production/v{}".format(version),
@@ -135,22 +135,22 @@ def branch_candidates(version: str) -> List[str]:
 
 
 def resolve_target_branch(repository: Path, version: str) -> str:
-    """バージョンラベルに対応する、存在するブランチを1つだけ特定する。"""
+    """Versionラベルに対応する、存在するブランチを1つだけ特定する。"""
     # 同じ版の評価用ブランチと出荷候補ブランチを同時に扱うと、意図しない版へ
-    # push する危険がある。0個も2個以上も運用違反として止める。
+    # pushする危険がある。0個も2個以上も運用違反として止める。
     candidates = [
         branch for branch in branch_candidates(version)
         if git_remote_branch_exists(repository, branch)
     ]
     if not candidates:
         raise RuntimeError(
-            "Version/{} に対応する対象ブランチが存在しません (候補: {})".format(
+            "Version/{}に対応する対象ブランチが存在しません (候補: {})".format(
                 version, ", ".join(branch_candidates(version))
             )
         )
     if len(candidates) != 1:
         raise RuntimeError(
-            "Version/{} に対応する対象ブランチが複数存在します: {}".format(
+            "Version/{}に対応する対象ブランチが複数存在します: {}".format(
                 version, ", ".join(candidates)
             )
         )
@@ -167,7 +167,7 @@ class GitHubClient:
 
     def request(self, method: str, path: str, payload: Optional[Dict[str, Any]] = None) -> Any:
         """GitHub REST APIへJSONリクエストを送信する。"""
-        # Actions runner に追加パッケージをインストールせず、PAT Secret で
+        # Actions runnerに追加パッケージをインストールせず、PAT Secretで
         # PR情報の取得と結果コメントを行うため、標準ライブラリだけを使う。
         body = None if payload is None else json.dumps(payload).encode("utf-8")
         request = Request(
@@ -189,7 +189,7 @@ class GitHubClient:
             if isinstance(error, HTTPError):
                 detail = error.read().decode("utf-8", errors="replace")
             raise GitHubApiError(
-                "GitHub API {} {} が失敗しました: {}".format(method, path, detail)
+                "GitHub API {} {}が失敗しました: {}".format(method, path, detail)
             ) from error
 
         if not response_body:
@@ -217,12 +217,12 @@ class GitHubClient:
 
 def parse_version_labels(pull_request: Dict[str, Any]) -> List[str]:
     """Version/X.Y形式のラベルからVersion/プレフィックスを除いた値をソートして返す。"""
-    # 1つの PR が複数バージョンを対象にする場合があるため、全ラベルを処理する。
-    # set で重複を除き、sort で実行順を再現可能にする。
+    # 1つのPRが複数バージョンを対象にする場合があるため、全ラベルを処理する。
+    # setで重複を除き、sortで実行順を再現可能にする。
     versions = []
     for label in pull_request.get("labels", []):
         name = label.get("name", "")
-        # バージョンラベル以外を誤って出荷対象にしないため、形式を厳密に限定する。
+        # Versionラベル以外を誤って対象にしないため、形式を厳密に限定する。
         version_label_pattern = re.compile(r"^Version/([0-9]+\.[0-9]+)$")
         match = version_label_pattern.fullmatch(name)
         if match:
@@ -234,9 +234,9 @@ def validate_pull_request(
     pull_request: Dict[str, Any],
     merge_commit: Dict[str, Any],
 ) -> None:
-    """自動チェリーピックに必要な共通条件を検証する。"""
-    # 手動実行では任意の PR 番号を入力できるため、自動トリガーと同じ条件を
-    # スクリプト側でも検証し、誤った PR の出荷ブランチ反映を防止する。
+    """自動cherry-pickに必要な共通条件を検証する。"""
+    # 手動実行では任意のPR番号を入力できるため、自動トリガーと同じ条件を
+    # スクリプト側でも検証し、誤ったPRの出荷ブランチ反映を防止する。
     if pull_request.get("base", {}).get("ref") != "main":
         raise RuntimeError("PRのベースブランチがmainではありません")
     if not pull_request.get("merged_at"):
@@ -253,14 +253,14 @@ def validate_pull_request(
         raise RuntimeError("マージコミットが単一親のSquashコミットではありません")
 
 
-def process_version(
+def cherry_pick(
     repository: Path,
     source_commit: str,
     version: str,
     target_branch: str,
 ) -> Dict[str, str]:
-    """指定したコミットを指定したバージョンの既存ブランチへチェリーピックする。"""
-    # 1つの Version ラベルの処理を独立させる。呼び出し側は例外を結果に変換し、
+    """指定したコミットを指定したバージョンの既存ブランチへcherry-pickする。"""
+    # 1つのVersionラベルの処理を独立させる。呼び出し側は例外を結果に変換し、
     # ある版の失敗で別の版の処理まで止めない。
     remote_ref = "refs/remotes/origin/{}".format(target_branch)
     run_command(
@@ -276,17 +276,17 @@ def process_version(
     run_command(["git", "fetch", "--no-tags", "origin", source_commit], repository)
 
     if already_applied(repository, remote_ref, source_commit):
-        # 既反映なら push せず、再実行が安全に完了できる状態として扱う。
+        # 既反映ならpushせず、再実行が安全に完了できる状態として扱う。
         return {
             "status": "SKIP",
             "version": version,
             "branch": target_branch,
             "source": source_commit,
             "commit": "",
-            "reason": "すでにチェリーピック済みです",
+            "reason": "すでにcherry-pick済みです",
         }
 
-    # メインの checkout を直接切り替えず、一時 worktree で変更を隔離する。
+    # メインのcheckoutを直接切り替えず、一時worktreeで変更を隔離する。
     # 複数ラベルを順番に処理しても、次の処理へ作業ツリーの状態を持ち越さない。
     worktree = Path(tempfile.mkdtemp(prefix="auto-cherry-pick-"))
     try:
@@ -307,23 +307,18 @@ def process_version(
                     "branch": target_branch,
                     "source": source_commit,
                     "commit": "",
-                    "reason": "すでにチェリーピック済みか、チェリーピックする対象がありません",
+                    "reason": "すでにcherry-pick済みか、cherry-pickする対象がありません",
                 }
 
-            # conflict のときは実際のエラーを残す
-            print(
-                "競合が発生したため、{} を {} へチェリーピックできませんでした:".format(
-                    source_commit, target_branch
-                ),
-                file=sys.stderr,
-            )
+            # conflictのときは実際のエラーを残す
+            print("競合が発生したため、{}を{}へcherry-pickできませんでした:".format(source_commit, target_branch), file=sys.stderr)
             run_command(["git", "status", "--short"], worktree, check=False)
             raise
         run_command(
             ["git", "push", "origin", "HEAD:refs/heads/{}".format(target_branch)],
             worktree,
         )
-        # push 後の SHA を PR コメントに残し、出荷対象と反映結果を追跡できるようにする。
+        # push後のSHAをPRコメントに残し、出荷対象と反映結果を追跡できるようにする。
         pushed_commit = run_command(["git", "rev-parse", "HEAD"], worktree)
         return {
             "status": "SUCCESS",
@@ -331,11 +326,11 @@ def process_version(
             "branch": target_branch,
             "source": source_commit,
             "commit": pushed_commit,
-            "reason": "チェリーピックとpushが完了しました",
+            "reason": "cherry-pickとpushが完了しました",
         }
     except Exception:
-        # 競合時に未完了の cherry-pick 状態を残すと cleanup に失敗するため、
-        # 作業ツリーを必ず通常状態へ戻してから次の Version 処理へ進む。
+        # 競合時に未完了のcherry-pick状態を残すとcleanupに失敗するため、
+        # 作業ツリーを必ず通常状態へ戻してから次のVersion処理へ進む。
         run_command(["git", "cherry-pick", "--abort"], worktree, check=False)
         raise
     finally:
@@ -349,37 +344,37 @@ def process_version(
 
 def comment_for_result(result: Dict[str, str]) -> str:
     """1件の結果に対する新しいPRコメントを作成する。"""
-    # コメントは毎回新規投稿する仕様のため、後から Actions の実行履歴を追跡できる。
+    # コメントは毎回新規投稿する仕様のため、後からActionsの実行履歴を追跡できる。
     status = result["status"]
     if status == "SUCCESS":
         return (
-            "## 自動チェリーピック: 成功\n\n"
-            "- Versionラベル: `Version/{version}`\n"
-            "- チェリーピック先ブランチ: `{branch}`\n"
-            "- チェリーピック元コミット: {source}\n"
+            "## 自動cherry-pick結果: 成功\n\n"
+            "- versionラベル: `Version/{version}`\n"
+            "- cherry-pick先ブランチ: `{branch}`\n"
+            "- cherry-pick元コミット: {source}\n"
             "- pushしたコミット: {commit}"
         ).format(**result)
     if status == "SKIP":
         return (
-            "## 自動チェリーピック: スキップ\n\n"
-            "- Versionラベル: `Version/{version}`\n"
-            "- チェリーピック先ブランチ: `{branch}`\n"
-            "- チェリーピック元コミット: {source}\n"
+            "## 自動cherry-pick結果: スキップ\n\n"
+            "- versionラベル: `Version/{version}`\n"
+            "- cherry-pick先ブランチ: `{branch}`\n"
+            "- cherry-pick元コミット: {source}\n"
             "- 理由: {reason}"
         ).format(**result)
     if status == "WARNING":
         return (
-            "## 自動チェリーピック: 警告\n\n"
+            "## 自動cherry-pick結果: 警告\n\n"
             "- PR番号: `{pr_number}`\n"
             "- 理由: {reason}"
         ).format(**result)
     return (
-        "## 自動チェリーピック: エラー\n\n"
-        "- Versionラベル: `Version/{version}`\n"
-        "- チェリーピック先ブランチ: `{branch}`\n"
-        "- チェリーピック元コミット: {source}\n"
+        "## 自動cherry-pick結果: エラー\n\n"
+        "- versionラベル: `Version/{version}`\n"
+        "- cherry-pick先ブランチ: `{branch}`\n"
+        "- cherry-pick元コミット: {source}\n"
         "- 理由: {reason}\n"
-        "- 必ず手動でのチェリーピックを実施してください。"
+        "- 必ず手動でのcherry-pickを実施してください。"
     ).format(**result)
 
 
@@ -389,7 +384,7 @@ def post_result_comment(
     result: Dict[str, str],
 ) -> bool:
     """結果コメントを投稿し、成功したかどうかを返す。"""
-    # コメント投稿自体の失敗も監査情報の欠落なので、呼び出し側で Actions を失敗にする。
+    # コメント投稿自体の失敗も監査情報の欠落なので、呼び出し側でActionsを失敗にする。
     try:
         client.post_comment(pr_number, comment_for_result(result))
         return True
@@ -406,8 +401,8 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def main() -> int:
-    """自動チェリーピック処理を実行する。"""
-    # workflow はイベント処理だけを担当し、実際の対象判定と Git 操作はこの入口から
+    """自動cherry-pick処理を実行する。"""
+    # workflowはイベント処理だけを担当し、実際の対象判定とGit操作はこの入口から
     # 同じコードパスで実行する。自動実行と手動実行の挙動を一致させるためである。
     arguments = parse_arguments()
     token = os.environ.get("GH_TOKEN")
@@ -416,13 +411,13 @@ def main() -> int:
     repository_path = Path(os.environ.get("GITHUB_WORKSPACE", Path.cwd()))
 
     if not token or not repository_name:
-        print("GH_TOKEN と GH_REPOSITORY が必要です", file=sys.stderr)
+        print("GH_TOKENとGH_REPOSITORYが必要です", file=sys.stderr)
         return 1
 
     client = GitHubClient(api_url, repository_name, token)
     try:
-        # merge commit と PR の情報を API から再取得し、workflow のイベント情報だけに
-        # 依存しない。手動実行でも同じ検証を適用する。
+        # merge commitとPRの情報をAPIから再取得し、workflowのイベント情報だけに依存しない。
+        # 手動実行でも同じ検証を適用する。
         pull_request = client.get_pull_request(arguments.pr_number)
         merge_sha = pull_request.get("merge_commit_sha")
         if not merge_sha:
@@ -447,12 +442,12 @@ def main() -> int:
             print("Versionラベルがない旨の警告コメントの投稿に失敗しました", file=sys.stderr)
         return 0
 
-    # 1件の Version で失敗しても、同じ PR の他バージョンを処理して結果を集計する。
+    # あるのVersionで失敗しても、同じPRの他Versionを処理を継続して結果を集計する。
     failed = False
     for version in versions:
         try:
             target_branch = resolve_target_branch(repository_path, version)
-            result = process_version(repository_path, merge_sha, version, target_branch)
+            result = cherry_pick(repository_path, merge_sha, version, target_branch)
         except Exception as error:
             failed = True
             result = {
