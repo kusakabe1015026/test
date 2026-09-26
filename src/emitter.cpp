@@ -15,7 +15,7 @@ Emitter::Emitter() : m_pState(new EmitterState), m_stream{} {}
 
 Emitter::Emitter(std::ostream& stream)
     : m_pState(new EmitterState), m_stream(stream) {}
-//test4
+
 Emitter::~Emitter() = default;
 //test5
 const char* Emitter::c_str() const { return m_stream.str(); }
