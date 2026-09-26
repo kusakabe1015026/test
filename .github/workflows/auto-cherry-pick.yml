@@ -44,7 +44,8 @@ jobs:
       - name: Run automatic cherry-pick
         env:
           # APIのPR取得・コメント投稿とGit pushを同じPATで行う。
-          GH_TOKEN: ${{ secrets.AUTO_CHERRY_PICK_ACTIONS_TOKEN }}
+          #GH_TOKEN: ${{ secrets.AUTO_CHERRY_PICK_ACTIONS_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_API_URL: ${{ github.api_url }}
           GH_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event_name == 'workflow_dispatch' && inputs.pr_number || github.event.pull_request.number }}

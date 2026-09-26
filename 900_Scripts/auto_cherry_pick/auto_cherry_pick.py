@@ -18,7 +18,6 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-
 class CommandError(RuntimeError):
     """Raised when an external command fails."""
 
@@ -407,7 +406,8 @@ def main() -> int:
     # workflow はイベント処理だけを担当し、実際の対象判定と Git 操作はこの入口から
     # 同じコードパスで実行する。自動実行と手動実行の挙動を一致させるためである。
     arguments = parse_arguments()
-    token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    #token = os.environ.get("GH_TOKEN") or os.environ.get("GITHUB_TOKEN")
+    token = os.environ.get("GH_TOKEN")
     api_url = os.environ.get("GH_API_URL", "https://api.github.com")
     repository_name = os.environ.get("GH_REPOSITORY")
     repository_path = Path(os.environ.get("GITHUB_WORKSPACE", Path.cwd()))
