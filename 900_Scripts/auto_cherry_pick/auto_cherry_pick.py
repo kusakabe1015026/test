@@ -501,7 +501,7 @@ def main() -> int:
             result = {
                 "status": "ERROR",
                 "version": version,
-                "branch": "N/A",
+                "branch": taret_branch,
                 "source": merge_sha,
                 "reason": str(error),
             }
