@@ -12,7 +12,7 @@ class Binary;
 struct _Null;
 
 Emitter::Emitter() : m_pState(new EmitterState), m_stream{} {}
-//test3
+
 Emitter::Emitter(std::ostream& stream)
     : m_pState(new EmitterState), m_stream(stream) {}
 //test4
