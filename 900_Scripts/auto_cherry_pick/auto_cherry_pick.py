@@ -18,11 +18,6 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-# Version ラベル以外を誤って出荷対象にしないため、形式を厳密に限定する。
-VERSION_LABEL_PATTERN = re.compile(r"^Version/([0-9]+\.[0-9]+)$")
-# `cherry-pick -x` が残す元コミットの記録を、既反映判定に利用する。
-CHERRY_PICK_TRAILER_TEMPLATE = "cherry picked from commit {}"
-
 
 class CommandError(RuntimeError):
     """Raised when an external command fails."""
@@ -116,61 +111,18 @@ def git_remote_branch_exists(repository: Path, branch: str) -> bool:
     return result.returncode == 0 and bool(result.stdout.strip())
 
 
-def patch_id(repository: Path, commit: str) -> Optional[str]:
-    """Calculate the stable patch-id for a commit."""
-    # SHA が異なっても同じ変更内容なら検出できるよう、コミット番号ではなく
-    # 差分から patch-id を作る。手動 cherry-pick で -x 記録がない場合の補助である。
-    show = subprocess.run(
-        ["git", "show", "--format=", "--no-ext-diff", commit],
-        cwd=str(repository),
-        text=False,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    if show.returncode != 0:
-        raise CommandError(show.stderr.decode(errors="replace").strip())
-
-    result = subprocess.run(
-        ["git", "patch-id", "--stable"],
-        cwd=str(repository),
-        input=show.stdout,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    if result.returncode != 0:
-        raise CommandError(result.stderr.decode(errors="replace").strip())
-
-    line = result.stdout.decode(errors="replace").strip().splitlines()
-    if not line:
-        return None
-    return line[0].split()[0]
-
-
 def already_applied(repository: Path, remote_ref: str, source_commit: str) -> bool:
     """Check the cherry-pick trailer and then compare patch-ids."""
     # Actions の再実行や複数ラベル処理で同じ変更を二重反映しないための冪等性判定。
-    # まず高速で確実な -x 記録を調べ、見つからないときだけ全履歴の差分を比較する。
+    # `cherry-pick -x` が残す元コミットの記録を、既反映判定に利用する。
     log = run_command(
         ["git", "log", remote_ref, "--format=%B"],
         repository,
     ).lower()
-    trailer = CHERRY_PICK_TRAILER_TEMPLATE.format(source_commit).lower()
+    trailer = "cherry picked from commit {}".format(source_commit).lower()
     if trailer in log:
         return True
 
-    source_patch_id = patch_id(repository, source_commit)
-    if source_patch_id is None:
-        return False
-
-    commits = run_command(
-        ["git", "rev-list", "--no-merges", remote_ref],
-        repository,
-    ).splitlines()
-    for commit in commits:
-        if patch_id(repository, commit) == source_patch_id:
-            return True
     return False
 
 
@@ -272,7 +224,9 @@ def parse_version_labels(pull_request: Dict[str, Any]) -> List[str]:
     versions = []
     for label in pull_request.get("labels", []):
         name = label.get("name", "")
-        match = VERSION_LABEL_PATTERN.fullmatch(name)
+        # Version ラベル以外を誤って出荷対象にしないため、形式を厳密に限定する。
+        version_label_pattern = re.compile(r"^Version/([0-9]+\.[0-9]+)$")
+        match = version_label_pattern.fullmatch(name)
         if match:
             versions.append(match.group(1))
     return sorted(set(versions))
