@@ -5,7 +5,7 @@
 namespace YAML {
 static const char encoding[] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
+//test
 std::string EncodeBase64(const unsigned char *data, std::size_t size) {
   const char PAD = '=';
 
