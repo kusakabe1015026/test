@@ -112,9 +112,9 @@ def git_remote_branch_exists(repository: Path, branch: str) -> bool:
 
 def already_applied(repository: Path, remote_ref: str, source_commit: str) -> bool:
     """Actionsの再実行や複数ラベル処理で同じ変更を二重反映しないための冪等性判定を行う。"""
-    # `cherry-pick -x`が残す元コミットの記録を、既反映判定に利用する。
+    # `cherry-pick -x`が残す元コミットの記録を直近200件のログから検索し、既反映判定に利用する。
     log = run_command(
-        ["git", "log", remote_ref, "--format=%B"],
+        ["git", "log", "-n", "200", remote_ref, "--format=%B"],
         repository,
     ).lower()
     trailer = "cherry picked from commit {}".format(source_commit).lower()
@@ -374,7 +374,7 @@ def comment_for_result(result: Dict[str, str]) -> str:
         "- cherry-pick先ブランチ: `{branch}`\n"
         "- cherry-pick元コミット: {source}\n"
         "- 理由: {reason}\n"
-        "- 必ず手動でのcherry-pickを実施してください。"
+        "- **必ず手動でのcherry-pickを実施してください**"
     ).format(**result)
 
 
