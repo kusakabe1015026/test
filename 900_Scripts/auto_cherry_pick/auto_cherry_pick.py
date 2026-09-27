@@ -374,7 +374,7 @@ def comment_for_result(result: Dict[str, str]) -> str:
         "- cherry-pick先ブランチ: `{branch}`\n"
         "- cherry-pick元コミット: {source}\n"
         "- 理由: {reason}\n"
-        "- **必ず手動でのcherry-pickを実施してください**"
+        "- **必ず手動での処置を実施してください**"
     ).format(**result)
 
 
