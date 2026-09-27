@@ -445,6 +445,7 @@ def main() -> int:
     # あるのVersionで失敗しても、同じPRの他Versionを処理を継続して結果を集計する。
     failed = False
     for version in versions:
+        target_branch = "N/A"
         try:
             target_branch = resolve_target_branch(repository_path, version)
             result = cherry_pick(repository_path, merge_sha, version, target_branch)
