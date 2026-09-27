@@ -19,7 +19,7 @@ Emitter::Emitter(std::ostream& stream)
 Emitter::~Emitter() = default;
 //test5
 const char* Emitter::c_str() const { return m_stream.str(); }
-
+//test6
 std::size_t Emitter::size() const { return m_stream.pos(); }
 
 // state checking
