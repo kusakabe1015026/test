@@ -2,7 +2,7 @@ name: Auto cherry-pick
 
 on:
   # mainへのmerge完了を入口にする。closedだけでは未mergeのPRも発火するため、
-  # job 側で merged == true を確認する。
+  # job側でmerged == trueを確認する。
   pull_request:
     types:
       - closed
