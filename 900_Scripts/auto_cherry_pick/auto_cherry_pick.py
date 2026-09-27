@@ -348,7 +348,7 @@ def comment_for_result(result: Dict[str, str]) -> str:
     status = result["status"]
     if status == "SUCCESS":
         return (
-            "## 自動cherry-pick結果: 成功\n\n"
+            "## 🍒自動cherry-pick結果: 成功✅\n\n"
             "- versionラベル: `Version/{version}`\n"
             "- cherry-pick先ブランチ: `{branch}`\n"
             "- cherry-pick元コミット: {source}\n"
@@ -356,7 +356,7 @@ def comment_for_result(result: Dict[str, str]) -> str:
         ).format(**result)
     if status == "SKIP":
         return (
-            "## 自動cherry-pick結果: スキップ\n\n"
+            "## 🍒自動cherry-pick結果: スキップ⏭\n\n"
             "- versionラベル: `Version/{version}`\n"
             "- cherry-pick先ブランチ: `{branch}`\n"
             "- cherry-pick元コミット: {source}\n"
@@ -364,12 +364,12 @@ def comment_for_result(result: Dict[str, str]) -> str:
         ).format(**result)
     if status == "WARNING":
         return (
-            "## 自動cherry-pick結果: 警告\n\n"
+            "## 🍒自動cherry-pick結果: 警告⚠\n\n"
             "- PR番号: `{pr_number}`\n"
             "- 理由: {reason}"
         ).format(**result)
     return (
-        "## 自動cherry-pick結果: エラー\n\n"
+        "## 🍒自動cherry-pick結果: 失敗❌\n\n"
         "- versionラベル: `Version/{version}`\n"
         "- cherry-pick先ブランチ: `{branch}`\n"
         "- cherry-pick元コミット: {source}\n"
