@@ -1,0 +1,23 @@
+name: Test Japanese Argument
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Test Japanese argument
+        shell: pwsh
+        run: |
+          $arg = "日本語テスト・開発資料・あいうえお"
+
+          Write-Host "PowerShell argument:"
+          Write-Host $arg
+
+          Write-Host "----- a.exe output -----"
+          .\a.exe "$arg"
+
